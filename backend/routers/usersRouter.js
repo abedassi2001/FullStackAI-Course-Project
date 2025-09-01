@@ -1,30 +1,20 @@
-// here we will setup our userrouter 
+// backend/routers/usersRouter.js
 const express = require("express");
 const ctrl = require("../controllers/usersController");
+const { requireAuth, requireRole } = require("../middlewares/authMiddleware");
+
 const router = express.Router();
 
-// Register a new user
-// POST http://localhost:3000/users/register
+// public
 router.post("/register", ctrl.register);
-
-// Login and get JWT token
-// POST http://localhost:3000/users/login
 router.post("/login", ctrl.login);
 
-// Get all users
-// GET http://localhost:3000/users
-router.get("/",ctrl.list);
+// protected: admin only
+router.get("/", requireAuth, requireRole("admin"), ctrl.list);
 
-// Get single user by ID
-// GET http://localhost:3000/users/:id
-router.get("/:id", ctrl.getOne);
-
-// Update user by ID
-// PUT http://localhost:3000/users/:id
-router.put("/:id", ctrl.update);
-
-// Delete user by ID
-// DELETE http://localhost:3000/users/:id
-router.delete("/:id", ctrl.remove);
+// protected: أي مستخدم مسجل يقدر يجيب حاله/يعدل حاله (عدل حسب احتياجك)
+router.get("/:id", requireAuth, ctrl.getOne);
+router.put("/:id", requireAuth, ctrl.update);
+router.delete("/:id", requireAuth, requireRole("admin"), ctrl.remove);
 
 module.exports = router;
