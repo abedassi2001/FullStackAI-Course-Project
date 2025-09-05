@@ -1,5 +1,6 @@
 // this class will call the repository and will do any business logic if needed
 // backend/services/usersService.js
+const bcrypt = require("bcrypt");
 
 const jwt = require("jsonwebtoken");
 const repo = require("../repositories/usersRepository");
@@ -50,12 +51,18 @@ async function loginUser({ email, password }) {
     throw new Error("email and password are required");
   }
 
+  // 🔹 find user by email
   const user = await repo.getUserByEmail(email.toLowerCase());
   if (!user) throw new Error("Invalid credentials");
 
-  if (user.password !== password) throw new Error("Invalid credentials");
+  // 🔹 compare hashed password
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) throw new Error("Invalid credentials");
 
+  // 🔹 generate JWT
   const token = generateToken(user);
+
+  // use toJSON() to strip sensitive fields (like password)
   return { user: user.toJSON(), token };
 }
 
