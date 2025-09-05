@@ -53,3 +53,5 @@ coverage/
 
 # Misc
 *.tgz
+".env" 
+"backend/.env" 
