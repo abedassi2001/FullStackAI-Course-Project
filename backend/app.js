@@ -1,11 +1,8 @@
 const express = require("express");
-const usersRouter = require("./routers/usersRouter");
-const queryRouter = require("./routers/queryRouter");   
-
 const app = express();
-app.use(express.json());
+const queryRouter = require("./routers/queryRouter");
 
-// Users routes
-app.use("/users", usersRouter);
+app.use(express.json()); // parse JSON bodies
 app.use("/queries", queryRouter);
+
 module.exports = app;

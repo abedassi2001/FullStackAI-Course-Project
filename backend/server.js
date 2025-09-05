@@ -1,15 +1,19 @@
-const path = require("path");
-// لو ملف .env في جذر المشروع:
-require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
-
-
 require("dotenv").config();
-const { connectDB } = require("./utils/db");
 const app = require("./app");
+const sequelize = require("./utils/mysql.db"); // Sequelize instance
 
 const PORT = process.env.PORT || 3000;
 
-// Connect to MongoDB then start server
-connectDB(process.env.MONGO_URI).then(() => {
-  app.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));
-});
+(async () => {
+  try {
+    await sequelize.authenticate();
+    await sequelize.sync({ alter: true });
+    console.log("✅ MySQL connected and tables synced");
+
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running at http://localhost:${PORT}`);
+    });
+  } catch (err) {
+    console.error("❌ Failed to start server:", err);
+  }
+})();

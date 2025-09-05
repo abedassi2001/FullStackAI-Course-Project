@@ -1,13 +1,22 @@
-// query.controller.js
-// This file handles incoming HTTP requests for queries.
-// It receives req/res from Express, calls the service, and returns a response.
-//
-// Example functions:
-// - create(req, res, next): calls queryService.createQuery(req.user.id, req.body)
-// - getOne(req, res, next): calls queryService.getQueryById(req.params.id)
-// - getAll(req, res, next): calls queryService.getAllQueries()
-// - update(req, res, next): calls queryService.updateQuery(req.params.id, req.body)
-// - delete(req, res, next): calls queryService.deleteQuery(req.params.id)
-//
-// NOTE: Controller = ONLY request/response handling.
-// All logic goes into service, and all DB work goes into repository.
+const queryService = require("../services/queryService");
+
+exports.create = async (req, res) => {
+  try {
+    const prompt = req.body.prompt;
+    if (!prompt) return res.status(400).json({ success: false, message: "Prompt is required" });
+
+    const query = await queryService.createQuery(1, prompt); // userId = 1 for now
+    res.json({ success: true, data: query });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getAll = async (req, res) => {
+  try {
+    const queries = await queryService.getAllQueries();
+    res.json({ success: true, data: queries });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};

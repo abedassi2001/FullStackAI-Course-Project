@@ -1,12 +1,29 @@
-// query.repository.js
-// This file contains all MySQL queries related to the Query entity.
-// It should use the Query model (if Sequelize) or raw SQL if using mysql2.
-//
-// Functions to implement:
-// - create(queryData): insert a new query row into DB
-// - findById(id): fetch one query by id
-// - findAll(): fetch all queries
-// - update(id, updates): update query row by id
-// - delete(id): remove query row by id
-//
-// NOTE: Repository = ONLY database calls, NO business logic.
+// backend/repositories/queryRepository.js
+const Query = require("../models/query");
+
+const create = async (data) => {
+  return await Query.create(data);
+};
+
+const findById = async (id) => {
+  return await Query.findByPk(id);
+};
+
+const findAll = async () => {
+  return await Query.findAll();
+};
+
+const update = async (id, updates) => {
+  const query = await Query.findByPk(id);
+  if (!query) return null;
+  return await query.update(updates);
+};
+
+const remove = async (id) => {
+  const query = await Query.findByPk(id);
+  if (!query) return null;
+  await query.destroy();
+  return true;
+};
+
+module.exports = { create, findById, findAll, update, remove };
