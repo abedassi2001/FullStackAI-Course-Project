@@ -55,3 +55,7 @@ coverage/
 *.tgz
 ".env" 
 "backend/.env" 
+
+
+.env
+backend/.env
