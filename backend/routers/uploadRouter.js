@@ -1,16 +1,12 @@
+// backend/routers/uploadRouter.js
 const express = require("express");
-const upload = require("../middlewares/upload"); // multer config
+const upload = require("../middlewares/upload"); // multer config (saves to /uploads)
 const uploadController = require("../controllers/uploadController");
+const { requireAuth } = require("../middlewares/authMiddleware");
 
 const router = express.Router();
 
-router.post("/", upload.single("dbfile"), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "DB file is required" });
-
-  // Just use the path directly
-  const dbFilePath = req.file.path;
-
-  res.json({ success: true, file: req.file.filename, path: dbFilePath });
-});
+// ✅ Protected: tie uploaded DB to authenticated user
+router.post("/", requireAuth, upload.single("dbfile"), uploadController.uploadDB);
 
 module.exports = router;
