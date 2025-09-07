@@ -1,9 +1,11 @@
+// backend/routers/queryRouter.js
 const express = require("express");
 const router = express.Router();
 const queryController = require("../controllers/queryController");
-const { upload } = require("../middlewares/queryMiddleware"); // import upload
+const { requireAuth } = require("../middlewares/authMiddleware");
 
-router.post("/", upload.single("dbfile"), queryController.create);
-router.get("/", queryController.getAll);
+// ✅ No file upload here anymore; queries use the saved dbFilePath
+router.post("/", requireAuth, queryController.create);
+router.get("/", requireAuth, queryController.getAll);
 
 module.exports = router;
