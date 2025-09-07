@@ -16,16 +16,19 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true, minlength: 3 },
     status: { type: String, enum: ["active", "inactive"], default: "active" },
     role: { type: String, enum: ["user", "admin"], default: "user" },
+
+    // ✅ New field to store the absolute path of the uploaded SQLite DB file
+    dbFilePath: { type: String, default: null },
   },
   { timestamps: true }
 );
 
 // ✅ Hash password before saving
 userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next(); // only hash if password is new/modified
+  if (!this.isModified("password")) return next();
 
   try {
-    const salt = await bcrypt.genSalt(10); // 10 rounds
+    const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
     next();
   } catch (err) {
