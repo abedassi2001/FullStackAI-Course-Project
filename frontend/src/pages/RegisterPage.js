@@ -1,30 +1,57 @@
-import { useState } from "react";
+import { Link } from "react-router-dom";
+import "./RegisterPage.css"; // we can reuse HomePage.css for base styles
 
 export default function RegisterPage() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPass] = useState("");
-
-  const onSubmit = (e) => {
-    e.preventDefault();
-    console.log({ name, email, password });
-  };
-
   return (
-    <div className="auth">
-      <h2>Register</h2>
-      <form onSubmit={onSubmit} className="form">
-        <label>Full Name</label>
-        <input value={name} onChange={(e)=>setName(e.target.value)} required />
+    <div className="hero">
+      <div className="noise"></div>
 
-        <label>Email</label>
-        <input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} required />
+      <header className="hero__nav">
+        <Link to="/" className="brand">FullStackAI</Link>
+      </header>
 
-        <label>Password</label>
-        <input type="password" value={password} onChange={(e)=>setPass(e.target.value)} required />
+      <main className="hero__content">
+        <h1 className="title">Create your <span>FullStackAI</span> account ✨</h1>
+        <p className="subtitle">Fill in the details below to start building and testing your projects.</p>
 
-        <button type="submit" className="btn primary">Create Account</button>
-      </form>
+        <form className="register-form">
+          <label>
+            Full Name
+            <input type="text" name="fullname" placeholder="John Doe" required />
+          </label>
+
+          <label>
+            Email
+            <input type="email" name="email" placeholder="you@example.com" required />
+          </label>
+
+          <label>
+            Password
+            <input type="password" name="password" placeholder="Enter your password" required />
+          </label>
+
+          <label>
+            Confirm Password
+            <input type="password" name="confirmPassword" placeholder="Confirm your password" required />
+          </label>
+
+          <label className="checkbox-label">
+            <input type="checkbox" name="terms" required />
+            I agree to the Terms and Conditions
+          </label>
+
+          <button type="submit" className="btn btn-primary">Register</button>
+        </form>
+
+        <div className="actions">
+          <span className="muted">Already have an account? </span>
+          <Link to="/login" className="btn btn-ghost">Log In</Link>
+        </div>
+      </main>
+
+      <footer className="hero__footer">
+        <span>© {new Date().getFullYear()} FullStackAI</span>
+      </footer>
     </div>
   );
 }
