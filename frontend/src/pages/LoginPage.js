@@ -1,26 +1,42 @@
-import { useState } from "react";
+import { Link } from "react-router-dom";
+import "./LoginPage.css"; // we can reuse HomePage.css or create small overrides
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
-  const onSubmit = (e) => {
-    e.preventDefault();
-    console.log({ email, password });
-  };
-
   return (
-    <div className="auth">
-      <h2>Login</h2>
-      <form onSubmit={onSubmit} className="form">
-        <label>Email</label>
-        <input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} required />
+    <div className="hero">
+      <div className="noise"></div>
 
-        <label>Password</label>
-        <input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} required />
+      <header className="hero__nav">
+        <Link to="/" className="brand">FullStackAI</Link>
+      </header>
 
-        <button type="submit" className="btn primary">Login</button>
-      </form>
+      <main className="hero__content">
+        <h1 className="title">Sign in to <span>FullStackAI</span> 🔑</h1>
+        <p className="subtitle">Enter your email and password to access your account.</p>
+
+        <form className="login-form">
+          <label>
+            Email
+            <input type="email" name="email" placeholder="you@example.com" required />
+          </label>
+
+          <label>
+            Password
+            <input type="password" name="password" placeholder="Enter your password" required />
+          </label>
+
+          <button type="submit" className="btn btn-primary">Log In</button>
+        </form>
+
+        <div className="actions">
+          <span className="muted">Don't have an account? </span>
+          <Link to="/register" className="btn btn-ghost">Register</Link>
+        </div>
+      </main>
+
+      <footer className="hero__footer">
+        <span>© {new Date().getFullYear()} FullStackAI</span>
+      </footer>
     </div>
   );
 }
