@@ -32,7 +32,7 @@ async function getUserById(id) {
  * @param {string} email
  * @returns {Promise<User|null>}
  */
-async function getUserByEmail(email) {
+async function getUserByEmail(email) {        
   return User.findOne({ email });
 }
 
