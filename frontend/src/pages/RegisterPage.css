@@ -1,0 +1,44 @@
+.register-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 400px;
+  margin: 0 auto 24px;
+}
+
+.register-form label {
+  display: flex;
+  flex-direction: column;
+  font-weight: 600;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.register-form input {
+  margin-top: 6px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--ring);
+  background: var(--glass);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  transition: border 0.15s ease, box-shadow 0.15s ease;
+}
+
+.register-form input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 12px color-mix(in oklab, var(--primary) 55%, transparent);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.register-form button {
+  margin-top: 8px;
+}

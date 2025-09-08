@@ -23,25 +23,31 @@ function generateToken(user) {
  * Register a new user (no hashing, password saved as plain text)
  */
 async function registerUser({ name, email, password, role = "user", status = "active" }) {
-  if (!name || !email || !password) {
-    throw new Error("name, email and password are required");
+  try {
+    if (!name || !email || !password) {
+      throw new Error("Name, email and password are required");
+    }
+
+    const existing = await repo.getUserByEmail(email.toLowerCase());
+    if (existing) {
+      throw new Error("Email already in use");
+    }
+
+    const created = await repo.createUser({
+      name,
+      email: email.toLowerCase(),
+      password, // model will hash this
+      role,
+      status,
+    });
+
+    return created.toJSON();
+  } catch (err) {
+    console.error("❌ registerUser error:", err);
+    throw err; // pass the same error up to controller
   }
-
-  const existing = await repo.getUserByEmail(email.toLowerCase());
-  if (existing) {
-    throw new Error("Email already in use");
-  }
-
-  const created = await repo.createUser({
-    name,
-    email: email.toLowerCase(),
-    password, // plain text
-    role,
-    status,
-  });
-
-  return created.toJSON();
 }
+
 
 /**
  * Login with email + password
