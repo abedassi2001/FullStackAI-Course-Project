@@ -53,10 +53,11 @@ async function registerUser({ name, email, password, role = "user", status = "ac
  * Login with email + password
  */
 async function loginUser({ email, password }) {
+  console.log(email,password);
   if (!email || !password) {
     throw new Error("email and password are required");
   }
-
+console.log(email,password);
   // 🔹 find user by email
   const user = await repo.getUserByEmail(email.toLowerCase());
   if (!user) throw new Error("Invalid credentials");
