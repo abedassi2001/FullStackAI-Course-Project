@@ -4,7 +4,7 @@ const { connectMongoDB } = require("./utils/db"); // ✅ use the right name
 const sequelize = require("./utils/mysql.db");
 const app = require("./app");
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 
 (async () => {
   try {
