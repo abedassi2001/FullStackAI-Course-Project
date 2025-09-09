@@ -15,16 +15,22 @@ export default function LoginPage() {
 
   // handle form submit
   async function handleSubmit(e) {
+     //alert("i got here 1");
     e.preventDefault();
+      //alert("i got here 2");
     setLoading(true);
+      //alert("i got here 3");
+
 
     try {
+      //alert("i got here 4");
       const res = await fetch("http://localhost:5000/users/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-
+      alert("i got here 5");
+      alert(res);
       const data = await res.json();
 
       if (!res.ok) {

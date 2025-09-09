@@ -1,7 +1,6 @@
 require("dotenv").config();
-const path = require("path");
-const { connectMongoDB } = require("./utils/db"); // ✅ use the right name
-const sequelize = require("./utils/mysql.db");
+const { connectMongoDB } = require("./utils/db"); // MongoDB connection helper
+const sequelize = require("./utils/mysql.db"); // MySQL connection helper
 const app = require("./app");
 
 const PORT = process.env.PORT || 5000;
@@ -9,7 +8,11 @@ const PORT = process.env.PORT || 5000;
 (async () => {
   try {
     // Connect to MongoDB
+    if (!process.env.MONGO_URI) {
+      throw new Error("MONGO_URI is not defined in .env");
+    }
     await connectMongoDB(process.env.MONGO_URI);
+    console.log("✅ MongoDB connected");
 
     // Connect to MySQL
     await sequelize.authenticate();
@@ -21,7 +24,7 @@ const PORT = process.env.PORT || 5000;
       console.log(`🚀 Server running at http://localhost:${PORT}`);
     });
   } catch (err) {
-    console.error("❌ Failed to start server:", err.message);
+    console.error("❌ Failed to start server:", err);
     process.exit(1);
   }
 })();
