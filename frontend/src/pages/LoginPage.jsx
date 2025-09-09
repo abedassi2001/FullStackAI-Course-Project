@@ -3,49 +3,55 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./LoginPage.css"; // can reuse RegisterPage.css styles too
 
+// CRA/webpack: use REACT_APP_API_URL (fallback to 5000)
+const API_BASE = (
+  process.env.REACT_APP_API_URL || "http://localhost:5000"
+).replace(/\/$/, "");
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
 
-  // handle typing in inputs
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
-  // handle form submit
   async function handleSubmit(e) {
-     //alert("i got here 1");
     e.preventDefault();
-      //alert("i got here 2");
     setLoading(true);
-      //alert("i got here 3");
-
 
     try {
-      //alert("i got here 4");
-      const res = await fetch("http://localhost:5000/users/login", {
+      const res = await fetch(`${API_BASE}/users/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // If you're not using cookies/sessions, you can remove credentials:
+        credentials: "include",
         body: JSON.stringify(form),
       });
-      alert("i got here 5");
-      alert(res);
-      const data = await res.json();
+
+      // Parse JSON safely; if it's not JSON, fall back to raw text
+      const raw = await res.text();
+      let data = null;
+      try { data = raw ? JSON.parse(raw) : null; } catch {}
 
       if (!res.ok) {
-        alert(data.error || "Login failed");
-      } else {
-        // ✅ store JWT + user info in localStorage
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
-
-        alert("Login successful!");
-        navigate("/dashboard"); // redirect after login
+        const msg =
+          (data && (data.message || data.error)) ||
+          (raw && raw.trim()) ||
+          `HTTP ${res.status}`;
+        alert(`Error: ${msg}`);
+        return;
       }
+
+      // Success — store JWT + user info
+      if (data?.token) localStorage.setItem("token", data.token);
+      if (data?.user) localStorage.setItem("user", JSON.stringify(data.user));
+
+      alert("Login successful!");
+      navigate("/dashboard");
     } catch (err) {
-      console.error("Login error:", err);
-      alert("Something went wrong. Please try again.");
+      alert(`Network error: ${err?.message || "Failed to reach server"}`);
     } finally {
       setLoading(false);
     }

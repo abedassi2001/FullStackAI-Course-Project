@@ -1,6 +1,12 @@
+// frontend/src/pages/RegisterPage.jsx
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./RegisterPage.css";
+
+// CRA/webpack: use REACT_APP_API_URL (fallback to 5000)
+const API_BASE = (
+  process.env.REACT_APP_API_URL || "http://localhost:5000"
+).replace(/\/$/, "");
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -14,44 +20,61 @@ export default function RegisterPage() {
   });
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value, checked, type } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
   };
 
-  const handleSubmit = async (e) => {
+  async function handleSubmit(e) {
     e.preventDefault();
 
+    if (!formData.terms) {
+      alert("Please accept the Terms and Conditions");
+      return;
+    }
     if (formData.password !== formData.confirmPassword) {
       alert("Passwords do not match");
       return;
     }
 
     try {
-      const res = await fetch("http://localhost:5000/users/register", {
+      const res = await fetch(`${API_BASE}/users/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
-          name: formData.name,        // 👈 fixed: send `name`
+          name: formData.name,
           email: formData.email,
           password: formData.password,
         }),
       });
 
-      if (res.ok) {
-        alert("Registration successful!");
-        navigate("/login"); // redirect to login page
-      } else {
-        const err = await res.json();
-        alert("Error: " + err.message);
+      // Try to parse JSON; fall back to text so errors aren’t “undefined”
+      const raw = await res.text();
+      let data = null;
+      try {
+        data = raw ? JSON.parse(raw) : null;
+      } catch {
+        /* not JSON */
       }
+
+      if (!res.ok) {
+        const msg =
+          (data && (data.message || data.error)) ||
+          (raw && raw.trim()) ||
+          `HTTP ${res.status}`;
+        alert(`Error: ${msg}`);
+        return;
+      }
+
+      alert("Registration successful!");
+      navigate("/login");
     } catch (err) {
-      console.error(err);
-      alert("Something went wrong");
+      alert(`Network error: ${err?.message || "Failed to reach server"}`);
     }
-  };
+  }
 
   return (
     <div className="hero">
@@ -74,8 +97,8 @@ export default function RegisterPage() {
             Full Name
             <input
               type="text"
-              name="name"                 // 👈 fixed
-              value={formData.name}       // 👈 fixed
+              name="name"
+              value={formData.name}
               onChange={handleChange}
               placeholder="John Doe"
               required
@@ -103,6 +126,7 @@ export default function RegisterPage() {
               onChange={handleChange}
               placeholder="Enter your password"
               required
+              minLength={3}
             />
           </label>
 

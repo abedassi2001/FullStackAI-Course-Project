@@ -1,12 +1,16 @@
 // backend/app.js
 const express = require("express");
 const app = express();
+const cors = require("cors");   // 👈 add this
 
 const uploadRouter = require("./routers/uploadRouter");
 const queryRouter = require("./routers/queryRouter");
 const usersRouter = require("./routers/usersRouter");
 const aiRouter = require("./routers/aiRouter");
-
+app.use(cors({
+  origin: ["http://localhost:5173", "http://localhost:3000"], // your frontend dev URL(s)
+  credentials: true
+}));
 app.use(express.json());
 
 // mount routers

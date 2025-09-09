@@ -1,14 +1,19 @@
-// this file will call the middle ware after getting calls from the usersrouter
-const repo = require("../repositories/usersRepository");
+// backend/controllers/usersController.js
+// This file receives requests from usersRouter and calls the service layer.
 const svc = require("../services/usersService");
+
+function sendError(res, status, err) {
+  const message = err?.message || String(err) || "Unknown error";
+  return res.status(status).json({ message, error: message });
+}
 
 // Register a new user
 async function register(req, res) {
   try {
     const user = await svc.registerUser(req.body);
-    res.status(201).json(user);
+    return res.status(201).json(user);
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    return sendError(res, 400, e);
   }
 }
 
@@ -16,48 +21,51 @@ async function register(req, res) {
 async function login(req, res) {
   try {
     const result = await svc.loginUser(req.body);
-    res.json(result);
+    return res.json(result);
   } catch (e) {
-    res.status(401).json({ error: e.message });
+    return sendError(res, 401, e);
   }
 }
 
-// List all users
+// List users (admin)
 async function list(req, res) {
-  const users = await repo.getAllUsers();
-  res.json(users);
+  try {
+    const users = await svc.listUsers();
+    return res.json(users);
+  } catch (e) {
+    return sendError(res, 400, e);
+  }
 }
 
-// Get one user by ID
+// Get one user
 async function getOne(req, res) {
   try {
-    const user = await repo.getUserById(req.params.id);
-    if (!user) return res.status(404).json({ error: "User not found" });
-    res.json(user);
+    const user = await svc.getUser(req.params.id);
+    if (!user) return sendError(res, 404, new Error("User not found"));
+    return res.json(user);
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    return sendError(res, 400, e);
   }
 }
 
 // Update user
 async function update(req, res) {
   try {
-    const user = await repo.updateUser(req.params.id, req.body);
-    if (!user) return res.status(404).json({ error: "User not found" });
-    res.json(user);
+    const updated = await svc.updateUser(req.params.id, req.body);
+    return res.json(updated);
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    return sendError(res, 400, e);
   }
 }
 
 // Delete user
 async function remove(req, res) {
   try {
-    const ok = await repo.deleteUser(req.params.id);
-    if (!ok) return res.status(404).json({ error: "User not found" });
-    res.json({ success: true });
+    const ok = await svc.deleteUser(req.params.id);
+    if (!ok) return sendError(res, 404, new Error("User not found"));
+    return res.json({ success: true });
   } catch (e) {
-    res.status(400).json({ error: e.message });
+    return sendError(res, 400, e);
   }
 }
 
