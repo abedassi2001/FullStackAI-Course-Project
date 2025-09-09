@@ -1,6 +1,4 @@
 // src/pages/AIChatPage.jsx
-//user chat 
-
 import React, { useState } from "react";
 import axios from "axios";
 
