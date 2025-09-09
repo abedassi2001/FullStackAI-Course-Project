@@ -1,38 +1,61 @@
+// backend/routers/aiRouter.js
 const express = require("express");
-const path = require("path");
-const upload = require("../middlewares/upload"); // multer config
-const { generateSQL, runSQL, explainResults } = require("../services/aiService");
+const upload = require("../middlewares/upload");
+const { requireAuth } = require("../middlewares/authMiddleware");
+const { generateSQL, explainResults } = require("../services/aiService");
+const {
+  fetchDbBufferFromMySQL,
+  bufferToTempSqlite,
+  runSQL,
+  getSchema,
+} = require("../services/fileDBService");
 
 const router = express.Router();
 
-// POST /ai/chat → prompt + db file
-router.post("/chat", upload.single("dbfile"), async (req, res) => {
+router.post("/chat", requireAuth, upload.single("dbfile"), async (req, res) => {
   try {
-    const { message } = req.body;
-    const dbFilePath = req.file ? req.file.path : null;
-
-    if (!message || !dbFilePath) {
-      return res.status(400).json({ success: false, message: "Message and DB file are required" });
+    const { message, dbId } = req.body || {};
+    if (!message && !req.file) {
+      return res.status(400).json({ success: false, message: "message is required" });
     }
 
-    // 1️⃣ Ask AI to convert NL prompt → SQL
-    const sql = await generateSQL(message, "Database schema is in SQLite format");
+    const uid = req.user?.id || req.user?._id;   // <— accept both
+    if (!uid) return res.status(401).json({ success: false, message: "Unauthorized" });
 
-    // 2️⃣ Run the SQL query on uploaded DB
-    const rows = await runSQL(dbFilePath, sql);
+    let dbPath = null;
 
-    // 3️⃣ Ask AI to explain results
+    if (req.file?.path) {
+      dbPath = req.file.path; // ad-hoc upload
+    } else {
+      if (!dbId) {
+        return res.status(400).json({ success: false, message: "dbId or dbfile is required" });
+      }
+      const row = await fetchDbBufferFromMySQL(dbId, uid);
+      if (!row) {
+        return res.status(404).json({ success: false, message: "DB not found for this user" });
+      }
+      dbPath = bufferToTempSqlite(row.file, row.filename);
+    }
+
+    const schemaText = await getSchema(dbPath);
+    const sql = (await generateSQL(message, schemaText)).trim();
+
+    if (!sql.toLowerCase().startsWith("select")) {
+      return res.status(400).json({
+        success: false,
+        message: "Only SELECT statements are allowed.",
+        sql,
+      });
+    }
+
+    const rows = await runSQL(dbPath, sql);
+    const columns = rows.length ? Object.keys(rows[0]) : [];
     const explanation = await explainResults(message, sql, rows);
 
-    res.json({
-      success: true,
-      sql,
-      rows,
-      explanation,
-    });
+    return res.json({ success: true, sql, columns, rows, explanation });
   } catch (err) {
-    console.error("❌ AI/DB error:", err.message);
-    res.status(500).json({ success: false, message: err.message });
+    console.error("❌ AI/DB error:", err);
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 
