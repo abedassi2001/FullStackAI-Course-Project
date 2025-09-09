@@ -1,17 +1,16 @@
 const mongoose = require("mongoose");
 
-/**
- * Connect to MongoDB
- * @param {string} uri - MongoDB connection string
- */
-async function connectDB(uri) {
+const connectMongoDB = async (uri) => {
   try {
-    await mongoose.connect(uri, { dbName: "fullstackai" });
+    await mongoose.connect(uri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true
+    });
     console.log("✅ MongoDB connected");
   } catch (err) {
-    console.error("❌ MongoDB connection error:", err.message);
-    process.exit(1); // stop the app if DB fails
+    console.error("❌ MongoDB connection failed:", err);
+    process.exit(1);
   }
-}
+};
 
-module.exports = { connectDB };
+module.exports = { connectMongoDB };  // <-- make sure it’s exported like this
