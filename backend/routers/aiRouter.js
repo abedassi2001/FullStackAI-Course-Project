@@ -1,30 +1,38 @@
 const express = require("express");
-const OpenAI = require("openai");
+const path = require("path");
+const upload = require("../middlewares/upload"); // multer config
+const { generateSQL, runSQL, explainResults } = require("../services/aiService");
 
 const router = express.Router();
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// POST /ai/chat
-router.post("/chat", async (req, res) => {
+// POST /ai/chat → prompt + db file
+router.post("/chat", upload.single("dbfile"), async (req, res) => {
   try {
     const { message } = req.body;
+    const dbFilePath = req.file ? req.file.path : null;
 
-    if (!message) {
-      return res.status(400).json({ error: "Message is required" });
+    if (!message || !dbFilePath) {
+      return res.status(400).json({ success: false, message: "Message and DB file are required" });
     }
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // fast + cost-efficient
-      messages: [{ role: "user", content: message }],
-    });
+    // 1️⃣ Ask AI to convert NL prompt → SQL
+    const sql = await generateSQL(message, "Database schema is in SQLite format");
 
-    res.json({ reply: completion.choices[0].message.content });
+    // 2️⃣ Run the SQL query on uploaded DB
+    const rows = await runSQL(dbFilePath, sql);
+
+    // 3️⃣ Ask AI to explain results
+    const explanation = await explainResults(message, sql, rows);
+
+    res.json({
+      success: true,
+      sql,
+      rows,
+      explanation,
+    });
   } catch (err) {
-    console.error("❌ OpenAI error:", err.message);
-    res.status(500).json({ error: "Failed to get AI response" });
+    console.error("❌ AI/DB error:", err.message);
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 

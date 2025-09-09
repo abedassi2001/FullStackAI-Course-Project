@@ -1,0 +1,28 @@
+{
+  "name": "fullstack-ai-project",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd backend && npm start",
+    "client": "cd frontend && npm start"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abedassi2001/FullStackAI-Course-Project.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/abedassi2001/FullStackAI-Course-Project/issues"
+  },
+  "homepage": "https://github.com/abedassi2001/FullStackAI-Course-Project#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
