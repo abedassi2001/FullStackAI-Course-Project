@@ -1,0 +1,26 @@
+.dashboard-hero {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #0b0f2a; /* dark blue background to match login */
+  color: #e0e0ff; /* light text for contrast */
+  font-family: 'Arial', sans-serif;
+  padding: 20px;
+}
+
+.dashboard-header, .dashboard-footer {
+  text-align: center;
+  padding: 10px 0;
+}
+
+.dashboard-header h1 {
+  color: #00aaff; /* bright blue accent */
+}
+
+.dashboard-content {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.2rem;
+}
