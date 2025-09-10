@@ -138,6 +138,12 @@
 .alert.error  { background:#31151b; border-color:#7a1f33; color:#ffc5d0; }
 .alert.info   { background:#0e2236; border-color:#1e5aa8; color:#b6d8ff; }
 
+/* Navigation section */
+.navigation-section{
+  margin-top:32px; padding-top:24px; border-top:1px solid var(--ring);
+  text-align:center;
+}
+
 /* Responsive */
 @media (max-width: 980px){
   .db-wrapper{ grid-template-columns:1fr; padding:36px 18px; }

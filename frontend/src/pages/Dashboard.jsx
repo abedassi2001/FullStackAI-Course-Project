@@ -1,11 +1,13 @@
 import React, { useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./Dashboard.css";
-import { uploadDatabase, activateDemoDatabase } from "../services/dbService";
+import axios from "axios";
 
 export default function Dashboard() {
   const [status, setStatus] = useState({ type: "", msg: "" });
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
+  const navigate = useNavigate();
 
   const onPickFile = () => fileInputRef.current?.click();
 
@@ -25,7 +27,17 @@ export default function Dashboard() {
     setStatus({ type: "info", msg: "Uploading…" });
 
     try {
-      await uploadDatabase(file);
+      const formData = new FormData();
+      formData.append("dbfile", file);
+      
+      const token = localStorage.getItem("token");
+      const response = await axios.post("http://localhost:5000/uploads", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      
       setStatus({ type: "success", msg: "Database uploaded successfully." });
     } catch (e) {
       setStatus({
@@ -47,8 +59,9 @@ export default function Dashboard() {
   const onUseDemo = async () => {
     setStatus({ type: "info", msg: "Loading demo database…" });
     try {
-      await activateDemoDatabase();
-      setStatus({ type: "success", msg: "Demo database is ready!" });
+      // For now, we'll create a simple demo database
+      // You can implement a demo database creation endpoint if needed
+      setStatus({ type: "success", msg: "Demo database feature coming soon!" });
     } catch (e) {
       setStatus({
         type: "error",
@@ -115,6 +128,16 @@ export default function Dashboard() {
         </button>
 
         {status.msg && <div className={`alert ${status.type}`}>{status.msg}</div>}
+
+        <div className="navigation-section">
+          <button
+            className="btn primary"
+            onClick={() => navigate("/ai-chat")}
+            type="button"
+          >
+            Go to AI Chat <span className="muted">(Start Querying)</span>
+          </button>
+        </div>
       </main>
     </div>
   );
