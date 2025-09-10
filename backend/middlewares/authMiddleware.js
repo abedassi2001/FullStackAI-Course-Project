@@ -3,38 +3,45 @@ const jwt = require("jsonwebtoken");
 
 const JWT_SECRET = process.env.JWT_SECRET || "change-me-please";
 
-/**
- * Extract token from:
+/** Extract token from:
  *  - Authorization: Bearer <token>
- *  - x-access-token: <token>   (fallback)
+ *  - x-access-token: <token>
+ *  - Cookie "token" (optional)
  */
 function getTokenFromReq(req) {
-  const h = req.headers["authorization"] || "";
-  if (h.startsWith("Bearer ")) return h.slice(7).trim();
-  return (req.headers["x-access-token"] || "").trim();
+  const h = req.headers["authorization"] || req.headers["Authorization"] || "";
+  if (typeof h === "string" && h.startsWith("Bearer ")) return h.slice(7).trim();
+  const x = req.headers["x-access-token"];
+  if (typeof x === "string" && x.trim()) return x.trim();
+  if (req.cookies?.token) return String(req.cookies.token).trim();
+  return null;
 }
 
-/**
- * Require a valid JWT. If valid, attaches req.user = { sub, role }
- */
+/** Require a valid JWT. Attaches req.user with both id and _id for compatibility. */
 function requireAuth(req, res, next) {
   try {
     const token = getTokenFromReq(req);
     if (!token) return res.status(401).json({ error: "Missing token" });
 
     const payload = jwt.verify(token, JWT_SECRET);
-    // payload contains whatever you signed: { sub, role, iat, exp }
-    req.user = { id: payload.sub, role: payload.role };
+    // Accept any of these claim names from your login signer
+    const uid = payload.sub || payload.id || payload._id;
+    if (!uid) return res.status(401).json({ error: "Invalid token payload" });
+
+    req.user = {
+      id: String(uid),
+      _id: String(uid),          // <— compatibility with code that uses _id
+      role: payload.role || "user",
+      email: payload.email,      // optional if you include it when signing
+      name: payload.name,        // optional
+    };
     next();
   } catch (e) {
     return res.status(401).json({ error: "Invalid or expired token" });
   }
 }
 
-/**
- * Require a specific role (e.g., 'admin')
- * Usage: router.get('/path', requireAuth, requireRole('admin'), handler)
- */
+/** Role guard (optional) */
 function requireRole(role) {
   return (req, res, next) => {
     if (!req.user) return res.status(401).json({ error: "Unauthorized" });

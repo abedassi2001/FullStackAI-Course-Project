@@ -1,60 +1,45 @@
+// backend/services/aiService.js
 const OpenAI = require("openai");
-const sqlite3 = require("sqlite3").verbose();
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// Run SQL against SQLite
-async function runSQL(dbFilePath, sql) {
-  return new Promise((resolve, reject) => {
-    const db = new sqlite3.Database(dbFilePath, sqlite3.OPEN_READWRITE, (err) => {
-      if (err) return reject(err);
-    });
-
-    db.all(sql, (err, rows) => {
-      db.close();
-      if (err) return reject(err);
-      resolve(rows);
-    });
-  });
-}
-
-// Ask AI for SQL
-async function generateSQL(prompt, schemaDescription) {
+// Ask AI for SQL (SELECT-only, SQLite dialect)
+async function generateSQL(prompt, schemaText) {
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
+    temperature: 0,
     messages: [
       {
         role: "system",
         content:
-          "You are a SQL generator. Convert natural language to VALID SQLite SQL. " +
-          "Return ONLY the SQL statement, no explanations, no markdown, no code fences."
+          "Convert natural language to a SINGLE SQLite SQL query. " +
+          "Use ONLY SELECT statements (no INSERT/UPDATE/DELETE/DDL). " +
+          "Return ONLY the SQL, no explanations or markdown.",
       },
-      { role: "user", content: `Schema: ${schemaDescription}\n\nPrompt: ${prompt}` },
+      {
+        role: "user",
+        content:
+          `SCHEMA (SQLite):\n${schemaText}\n\nPROMPT:\n${prompt}\n\n` +
+          "Output a single SELECT statement.",
+      },
     ],
   });
 
   let sql = completion.choices[0].message.content.trim();
-
-  // 🧹 Clean: remove code fences if AI added them
   sql = sql.replace(/```sql/gi, "").replace(/```/g, "").trim();
-
   return sql;
 }
 
-
-// Ask AI to explain results
+// Explain results
 async function explainResults(prompt, sql, rows) {
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
+    temperature: 0.2,
     messages: [
-      { role: "system", content: "You are a helpful assistant that explains SQL results in plain English." },
-      { role: "user", content: `Prompt: ${prompt}\nSQL: ${sql}\nResults: ${JSON.stringify(rows)}` },
+      { role: "system", content: "Explain SQL results in plain English briefly." },
+      { role: "user", content: `Prompt: ${prompt}\nSQL: ${sql}\nRows: ${JSON.stringify(rows).slice(0, 6000)}` },
     ],
   });
-
   return completion.choices[0].message.content.trim();
 }
 
-module.exports = { generateSQL, runSQL, explainResults };
+module.exports = { generateSQL, explainResults };
