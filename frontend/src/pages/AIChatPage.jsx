@@ -1,37 +1,54 @@
 // src/pages/AIChatPage.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import "./AIChatPage.css";
 
 export default function AIChatPage() {
   const [message, setMessage] = useState("");
-  const [dbFile, setDbFile] = useState(null);
+  const [selectedDbId, setSelectedDbId] = useState("");
+  const [databases, setDatabases] = useState([]);
   const [response, setResponse] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const navigate = useNavigate();
 
-  const handleFileChange = (e) => {
-    setDbFile(e.target.files[0]);
-  };
+  // Fetch user's saved databases on component mount
+  useEffect(() => {
+    const fetchDatabases = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await axios.get("http://localhost:5000/uploads", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setDatabases(res.data.databases || []);
+      } catch (err) {
+        console.error("Failed to fetch databases:", err);
+      }
+    };
+    fetchDatabases();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    if (!message || !dbFile) {
-      setError("Both message and DB file are required.");
+    if (!message || !selectedDbId) {
+      setError("Both message and database selection are required.");
       return;
     }
 
-    const formData = new FormData();
-    formData.append("message", message);
-    formData.append("dbfile", dbFile);
-
     setLoading(true);
     try {
-      const res = await axios.post("http://localhost:5000/ai/chat", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      const token = localStorage.getItem("token");
+      const res = await axios.post("http://localhost:5000/ai/chat", 
+        { message, dbId: selectedDbId },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
+        }
+      );
       setResponse(res.data);
     } catch (err) {
       setError(err.response?.data?.message || err.message);
@@ -43,25 +60,50 @@ export default function AIChatPage() {
 
   return (
     <div className="chat-container">
-      <h1>AI Chat with Database</h1>
+      <div className="chat-header">
+        <button 
+          className="back-btn" 
+          onClick={() => navigate("/dashboard")}
+          type="button"
+        >
+          ← Back to Dashboard
+        </button>
+        <h1>AI Chat with Database</h1>
+      </div>
 
       <form onSubmit={handleSubmit} className="chat-form">
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Ask your question..."
-          rows={4}
-          className="message-input"
-        />
+        <div className="form-group">
+          <label htmlFor="database-select">Select Database:</label>
+          <select
+            id="database-select"
+            value={selectedDbId}
+            onChange={(e) => setSelectedDbId(e.target.value)}
+            className="database-select"
+            required
+          >
+            <option value="">Choose a database...</option>
+            {databases.map((db) => (
+              <option key={db.id} value={db.id}>
+                {db.filename} ({Math.round(db.bytes / 1024)}KB)
+              </option>
+            ))}
+          </select>
+        </div>
 
-        <input
-          type="file"
-          accept=".db,.sqlite"
-          onChange={handleFileChange}
-          className="file-input"
-        />
+        <div className="form-group">
+          <label htmlFor="message-input">Your Question:</label>
+          <textarea
+            id="message-input"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Ask your question about the database..."
+            rows={4}
+            className="message-input"
+            required
+          />
+        </div>
 
-        <button type="submit" disabled={loading} className="submit-btn">
+        <button type="submit" disabled={loading || !selectedDbId} className="submit-btn">
           {loading ? "Processing..." : "Send to AI"}
         </button>
       </form>

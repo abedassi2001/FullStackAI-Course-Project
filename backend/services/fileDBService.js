@@ -5,7 +5,7 @@ const crypto = require("crypto");
 const mysql = require("mysql2/promise");
 const sqlite3 = require("sqlite3").verbose();
 
-// ---- Env mapping: supports MYSQL_PASS + MYSQL_DB (your names) and the standard ones
+// ---- Env mapping: supports MYSQL_PASS + MYSQL_DB and the standard names
 const MYSQL_HOST = process.env.MYSQL_HOST || "localhost";
 const MYSQL_PORT = Number(process.env.MYSQL_PORT || 3306);
 const MYSQL_USER = process.env.MYSQL_USER || "root";
@@ -31,7 +31,7 @@ const pool = mysql.createPool({
   namedPlaceholders: true,
 });
 
-// --- ensure schema (called lazily before first use) ---
+// --- ensure schema once ---
 let schemaReady = false;
 async function ensureSchema() {
   if (schemaReady) return;
@@ -52,12 +52,8 @@ async function ensureSchema() {
 // Optional health check
 async function pingMySQL() {
   const conn = await pool.getConnection();
-  try {
-    await conn.ping();
-    return true;
-  } finally {
-    conn.release();
-  }
+  try { await conn.ping(); return true; }
+  finally { conn.release(); }
 }
 
 // ---------- MySQL (blob storage) ----------
@@ -69,6 +65,18 @@ async function saveDbBufferToMySQL(userId, filename, buffer) {
   `;
   const [rs] = await pool.execute(sql, [String(userId), filename, buffer]);
   return rs.insertId;
+}
+
+async function listUserDBs(userId) {
+  await ensureSchema();
+  const [rows] = await pool.execute(
+    `SELECT id, filename, OCTET_LENGTH(file) AS bytes, created_at
+     FROM user_databases
+     WHERE user_id = ?
+     ORDER BY created_at DESC`,
+    [String(userId)]
+  );
+  return rows;
 }
 
 async function fetchDbBufferFromMySQL(dbId, userId) {
@@ -121,7 +129,7 @@ async function getSchema(dbFilePath) {
     new Promise((res, rej) => db.all(q, (e, r) => (e ? rej(e) : res(r))));
   try {
     const tables = await all(`
-      SELECT name, sql
+      SELECT name
       FROM sqlite_master
       WHERE type='table' AND name NOT LIKE 'sqlite_%'
       ORDER BY name;
@@ -145,6 +153,7 @@ async function getSchema(dbFilePath) {
 module.exports = {
   // MySQL/BLOB
   saveDbBufferToMySQL,
+  listUserDBs,
   fetchDbBufferFromMySQL,
   bufferToTempSqlite,
   pingMySQL,
