@@ -31,7 +31,7 @@ export default function Dashboard() {
       formData.append("dbfile", file);
       
       const token = localStorage.getItem("token");
-      const response = await axios.post("http://localhost:5000/uploads", formData, {
+      await axios.post("http://localhost:5000/uploads", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
           "Authorization": `Bearer ${token}`
@@ -59,9 +59,13 @@ export default function Dashboard() {
   const onUseDemo = async () => {
     setStatus({ type: "info", msg: "Loading demo database…" });
     try {
-      // For now, we'll create a simple demo database
-      // You can implement a demo database creation endpoint if needed
-      setStatus({ type: "success", msg: "Demo database feature coming soon!" });
+      const token = localStorage.getItem("token");
+      const res = await axios.post(
+        "http://localhost:5000/uploads/demo",
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setStatus({ type: "success", msg: `Demo DB ready: ${res.data.filename}` });
     } catch (e) {
       setStatus({
         type: "error",

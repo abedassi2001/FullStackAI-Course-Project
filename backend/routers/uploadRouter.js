@@ -18,4 +18,7 @@ router.get("/:id/download", requireAuth, ctrl.downloadDB);
 // Preview schema (tables + columns)
 router.get("/:id/schema", requireAuth, ctrl.schemaPreview);
 
+// Create and upload a demo SQLite database for the user
+router.post("/demo", requireAuth, ctrl.createDemoDB);
+
 module.exports = router;

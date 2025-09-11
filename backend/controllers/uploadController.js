@@ -8,6 +8,7 @@ const {
   bufferToTempSqlite,
   getSchema,
 } = require("../services/fileDBService");
+const sqlite3 = require("sqlite3").verbose();
 
 function getUid(req) {
   return req.user?.id || req.user?._id || null;
@@ -84,5 +85,47 @@ exports.schemaPreview = async (req, res) => {
   } catch (err) {
     console.error("Schema error:", err);
     res.status(500).json({ success: false, error: "Failed to read schema" });
+  }
+};
+
+// Create a small demo SQLite DB, store it as BLOB in MySQL for this user
+exports.createDemoDB = async (req, res) => {
+  try {
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ success: false, error: "Unauthorized" });
+
+    // Create a temporary SQLite DB file with a simple dataset
+    const tmpDir = path.join(__dirname, "..", "uploads", "tmp");
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const tmpPath = path.join(tmpDir, `demo-${Date.now()}.db`);
+
+    const db = new sqlite3.Database(tmpPath);
+    await new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.run(
+          "CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY, name TEXT, email TEXT, city TEXT);",
+          (e) => (e ? reject(e) : null)
+        );
+        const stmt = db.prepare("INSERT INTO customers (name, email, city) VALUES (?, ?, ?)");
+        const rows = [
+          ["Alice Smith", "alice@example.com", "New York"],
+          ["Bob Johnson", "bob@example.com", "San Francisco"],
+          ["Charlie Brown", "charlie@example.com", "Chicago"],
+          ["Diana Prince", "diana@example.com", "Metropolis"],
+          ["Ethan Hunt", "ethan@example.com", "Seattle"],
+        ];
+        for (const r of rows) stmt.run(r);
+        stmt.finalize((e) => (e ? reject(e) : resolve()));
+      });
+    });
+    db.close();
+
+    const buffer = fs.readFileSync(tmpPath);
+    const dbId = await saveDbBufferToMySQL(uid, "demo-database.db", buffer);
+
+    res.json({ success: true, dbId, filename: "demo-database.db" });
+  } catch (err) {
+    console.error("Create demo DB failed:", err);
+    res.status(500).json({ success: false, error: "Failed to create demo database" });
   }
 };

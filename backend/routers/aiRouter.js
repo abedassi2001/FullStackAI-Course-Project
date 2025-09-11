@@ -3,6 +3,7 @@ const express = require("express");
 const upload = require("../middlewares/upload");
 const { requireAuth } = require("../middlewares/authMiddleware");
 const { generateSQL, explainResults } = require("../services/aiService");
+const queryService = require("../services/queryService");
 const {
   fetchDbBufferFromMySQL,
   bufferToTempSqlite,
@@ -51,6 +52,9 @@ router.post("/chat", requireAuth, upload.single("dbfile"), async (req, res) => {
     const rows = await runSQL(dbPath, sql);
     const columns = rows.length ? Object.keys(rows[0]) : [];
     const explanation = await explainResults(message, sql, rows);
+
+    // Save prompt history (for suggestions)
+    try { await queryService.createQuery(Number(uid) || 1, message); } catch (_) {}
 
     return res.json({ success: true, sql, columns, rows, explanation });
   } catch (err) {
