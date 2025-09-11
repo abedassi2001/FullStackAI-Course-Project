@@ -17,6 +17,7 @@ export default function AIChatPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [chatMode, setChatMode] = useState("database"); // "database" or "free"
+  const [isCreatingSchema, setIsCreatingSchema] = useState(false);
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -26,19 +27,21 @@ export default function AIChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [history]);
 
+  // Fetch user's saved databases
+  const fetchDatabases = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get("http://localhost:5000/uploads", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setDatabases(res.data.databases || []);
+    } catch (err) {
+      console.error("Failed to fetch databases:", err);
+    }
+  };
+
   // Fetch user's saved databases on component mount
   useEffect(() => {
-    const fetchDatabases = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const res = await axios.get("http://localhost:5000/uploads", {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setDatabases(res.data.databases || []);
-      } catch (err) {
-        console.error("Failed to fetch databases:", err);
-      }
-    };
     fetchDatabases();
   }, []);
 
@@ -60,8 +63,97 @@ export default function AIChatPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    if (!message || !selectedDbId) {
-      setError("Both message and database selection are required.");
+    
+    // Check if this is a schema creation request
+    const lowerMessage = message.toLowerCase();
+    
+    // Only treat as schema creation if:
+    // 1. Checkbox is checked, OR
+    // 2. Message explicitly mentions creating/building/making a schema, OR
+    // 3. Message contains schema creation keywords but NOT query keywords
+    const hasSchemaCreationKeywords = lowerMessage.includes('create schema') || 
+                                     lowerMessage.includes('create a schema') ||
+                                     lowerMessage.includes('make a schema') ||
+                                     lowerMessage.includes('build a schema') ||
+                                     lowerMessage.includes('design a schema') ||
+                                     lowerMessage.includes('create random schema') ||
+                                     lowerMessage.includes('generate schema') ||
+                                     lowerMessage.includes('new schema');
+    
+    const hasQueryKeywords = lowerMessage.includes('show') || 
+                            lowerMessage.includes('select') || 
+                            lowerMessage.includes('get') || 
+                            lowerMessage.includes('find') || 
+                            lowerMessage.includes('list') ||
+                            lowerMessage.includes('display') ||
+                            lowerMessage.includes('query');
+    
+    const isSchemaRequest = isCreatingSchema || 
+                           (hasSchemaCreationKeywords && !hasQueryKeywords);
+
+    console.log('Message:', message);
+    console.log('Is creating schema checkbox:', isCreatingSchema);
+    console.log('Has schema creation keywords:', hasSchemaCreationKeywords);
+    console.log('Has query keywords:', hasQueryKeywords);
+    console.log('Is schema request:', isSchemaRequest);
+
+    if (isSchemaRequest) {
+      // Handle schema creation
+      const userMessage = { role: "user", content: message, timestamp: new Date() };
+      setHistory((h) => [...h, userMessage]);
+      setMessage("");
+      setLoading(true);
+
+      try {
+        console.log('Sending schema creation request...');
+        const token = localStorage.getItem("token");
+        const res = await axios.post("http://localhost:5000/ai/create-schema", 
+          { description: message },
+          {
+            headers: { 
+              "Content-Type": "application/json", 
+              Authorization: `Bearer ${token}` 
+            }
+          }
+        );
+        
+        console.log('Schema creation response:', res.data);
+        
+        const assistantMessage = { 
+          role: "assistant", 
+          content: res.data.message, 
+          timestamp: new Date(),
+          schemaCreated: true,
+          dbId: res.data.dbId
+        };
+        setHistory((h) => [...h, assistantMessage]);
+        
+        // Refresh databases list
+        fetchDatabases();
+      } catch (err) {
+        console.error('Schema creation error:', err);
+        const errorMessage = {
+          role: "assistant",
+          content: `Error: ${err.response?.data?.message || err.message}`,
+          timestamp: new Date(),
+          isError: true
+        };
+        setHistory((h) => [...h, errorMessage]);
+        setError(err.response?.data?.message || err.message);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Regular database query
+    if (!message) {
+      setError("Message is required.");
+      return;
+    }
+    
+    if (!selectedDbId && !isCreatingSchema) {
+      setError("Please select a database to query, or check 'Create Schema' to create a new database.");
       return;
     }
 
@@ -139,6 +231,7 @@ export default function AIChatPage() {
     }
   };
 
+
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -192,8 +285,29 @@ export default function AIChatPage() {
               </option>
             ))}
           </select>
+          
+          <div className="schema-creation-option">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={isCreatingSchema}
+                onChange={(e) => {
+                  setIsCreatingSchema(e.target.checked);
+                  if (e.target.checked) {
+                    setSelectedDbId(""); // Clear database selection when creating schema
+                  }
+                }}
+                className="checkbox-input"
+              />
+              <span className="checkbox-text">Create New Schema</span>
+            </label>
+            <p className="checkbox-description">
+              Check this to create a new database schema instead of querying an existing one
+            </p>
+          </div>
         </div>
       )}
+
 
       {/* Messages Container */}
       <div className="messages-container">
@@ -202,7 +316,7 @@ export default function AIChatPage() {
             <h2>👋 Hi! I'm your 2SQL AI Assistant</h2>
             <p>
               {chatMode === "database" 
-                ? "I can help you work with your database! Ask me to:\n• Show data: 'Show me all customers'\n• Add data: 'Add a new customer named John'\n• Update data: 'Change John's city to New York'\n• Delete data: 'Remove customer with email john@test.com'\n• Analyze data: 'Which city has the most customers?'"
+                ? "I can help you work with your database! Ask me to:\n• Show data: 'Show me all customers'\n• Add data: 'Add a new customer named John'\n• Update data: 'Change John's city to New York'\n• Delete data: 'Remove customer with email john@test.com'\n• Analyze data: 'Which city has the most customers?'\n• Create schemas: 'Create a school database with teachers and students'"
                 : "I'm here to help! I can answer questions, explain concepts, help with coding, or just have a friendly chat. What would you like to talk about?"
               }
             </p>
@@ -280,7 +394,9 @@ export default function AIChatPage() {
 
       {/* Input Area */}
       <div className="input-container">
-        <form onSubmit={chatMode === "database" ? handleSubmit : sendFreeTalk} className="input-form">
+        <form onSubmit={
+          chatMode === "database" ? handleSubmit : sendFreeTalk
+        } className="input-form">
           <div className="input-wrapper">
             <textarea
               ref={textareaRef}
@@ -296,7 +412,9 @@ export default function AIChatPage() {
               onKeyPress={handleKeyPress}
               placeholder={
                 chatMode === "database" 
-                  ? "Ask a question about your database..." 
+                  ? (isCreatingSchema 
+                      ? "Describe the schema you want to create..." 
+                      : "Ask a question about your database...")
                   : "Message AI..."
               }
               className="message-input"
@@ -309,8 +427,8 @@ export default function AIChatPage() {
               type="submit"
               disabled={
                 loading || 
-                freeLoading || 
-                (chatMode === "database" ? !message || !selectedDbId : !freeTalk)
+                freeLoading ||
+                (chatMode === "database" ? !message || (!selectedDbId && !isCreatingSchema) : !freeTalk)
               }
               className="send-btn"
             >

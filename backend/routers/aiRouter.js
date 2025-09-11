@@ -88,4 +88,100 @@ router.post("/talk", requireAuth, async (req, res) => {
   }
 });
 
+// Create schema from description
+router.post("/create-schema", requireAuth, async (req, res) => {
+  try {
+    console.log('📥 Schema creation request received:', req.body);
+    const { description } = req.body || {};
+    if (!description) return res.status(400).json({ success: false, message: "description is required" });
+
+    const uid = req.user?.id || req.user?._id;
+    if (!uid) return res.status(401).json({ success: false, message: "Unauthorized" });
+
+    console.log(`🔄 Creating schema from description for user: ${uid}`);
+    console.log(`📝 Description: ${description}`);
+
+    // Generate schema using AI
+    const schemaPrompt = `Create a database schema based on this description: "${description}". 
+    Return only SQL CREATE TABLE statements, one per table. Use SQLite-compatible syntax:
+    - Use INTEGER for IDs with PRIMARY KEY
+    - Use TEXT for strings
+    - Use REAL for numbers
+    - Use DATETIME for dates
+    - Do NOT include FOREIGN KEY constraints (we'll handle relationships separately)
+    - Do NOT include CREATE DATABASE statements
+    - Each table should have an id INTEGER PRIMARY KEY AUTOINCREMENT column
+    - Use AUTOINCREMENT (not AUTO_INCREMENT) for SQLite compatibility`;
+    
+    const schemaSQL = await generateSQL(schemaPrompt, "", uid);
+    console.log(`🔍 Generated schema SQL: ${schemaSQL}`);
+    
+    // Remove any CREATE DATABASE statements as SQLite doesn't support them
+    const cleanedSQL = schemaSQL.replace(/CREATE DATABASE\s+\w+;?\s*/gi, '');
+    console.log(`🧹 Cleaned schema SQL: ${cleanedSQL}`);
+
+    // Create a temporary SQLite database with the generated schema
+    const sqlite3 = require("sqlite3").verbose();
+    const fs = require("fs");
+    const path = require("path");
+    const os = require("os");
+    const crypto = require("crypto");
+    
+    const uniqueId = crypto.randomBytes(8).toString('hex');
+    const tmpPath = path.join(os.tmpdir(), `temp_schema_${uniqueId}_${Date.now()}.db`);
+    let sqliteDb;
+    
+    try {
+      sqliteDb = new sqlite3.Database(tmpPath);
+      
+      // Execute the schema creation
+      await new Promise((resolve, reject) => {
+        sqliteDb.exec(cleanedSQL, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      // Read the created database as buffer
+      const buffer = fs.readFileSync(tmpPath);
+      
+      // Convert to MySQL using existing service
+      const { convertSqliteToMysql } = require("../services/sqliteToMysqlService");
+      const result = await convertSqliteToMysql(uid, `generated_schema_${Date.now()}.db`, buffer);
+      
+      const message = `✅ Schema created successfully! I've generated a database with the following structure based on your description: "${description}". The database has been saved and is now available for querying.`;
+      
+      console.log(`✅ Schema created successfully: ${result.dbId}`);
+
+      return res.json({ 
+        success: true, 
+        message,
+        dbId: result.dbId,
+        schema: schemaSQL
+      });
+    } finally {
+      // Cleanup
+      if (sqliteDb) {
+        sqliteDb.close((err) => {
+          if (err) console.error("Error closing SQLite database:", err);
+        });
+      }
+      
+      // Wait a bit before trying to delete the file
+      setTimeout(() => {
+        try {
+          if (fs.existsSync(tmpPath)) {
+            fs.unlinkSync(tmpPath);
+          }
+        } catch (err) {
+          console.error("Error deleting temp file:", err);
+        }
+      }, 100);
+    }
+  } catch (err) {
+    console.error("❌ Schema creation error:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 module.exports = router;

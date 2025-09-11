@@ -146,6 +146,14 @@ function parseCreateStatement(createSql) {
     const trimmed = part.trim();
     if (!trimmed) continue;
     
+    // Skip table-level constraints (FOREIGN KEY, CHECK, etc.)
+    if (trimmed.toUpperCase().startsWith('FOREIGN KEY') || 
+        trimmed.toUpperCase().startsWith('CHECK') ||
+        trimmed.toUpperCase().startsWith('UNIQUE') ||
+        trimmed.toUpperCase().startsWith('CONSTRAINT')) {
+      continue;
+    }
+    
     // Split by whitespace and get the first two parts (name and type)
     const tokens = trimmed.split(/\s+/).filter(token => token.length > 0);
     if (tokens.length < 2) continue;
@@ -415,6 +423,15 @@ async function executeQueryOnUserDb(dbId, userId, query) {
   
   // Convert SQLite-specific queries to MySQL equivalents
   let modifiedQuery = query;
+  
+  // Handle SHOW TABLES - convert to schema-specific query
+  console.log(`🔍 Original query: "${query}"`);
+  console.log(`🔍 Schema name: "${schemaName}"`);
+  
+  if (modifiedQuery.trim().toUpperCase().replace(';', '') === 'SHOW TABLES') {
+    modifiedQuery = `SELECT TABLE_NAME as Tables_in_${schemaName} FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '${schemaName}'`;
+    console.log(`🔍 Converted SHOW TABLES to: "${modifiedQuery}"`);
+  }
   
   // Handle SQLite schema queries
   if (modifiedQuery.includes('sqlite_master')) {
