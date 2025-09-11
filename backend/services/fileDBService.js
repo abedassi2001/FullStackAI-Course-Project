@@ -1,6 +1,7 @@
 // backend/services/fileDBService.js
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
 const crypto = require("crypto");
 const mysql = require("mysql2/promise");
 const sqlite3 = require("sqlite3").verbose();
@@ -91,7 +92,7 @@ async function fetchDbBufferFromMySQL(dbId, userId) {
 
 // ---------- Temp file helpers ----------
 function ensureTmpDir() {
-  const dir = path.join(__dirname, "..", "uploads", "tmp");
+  const dir = path.join(os.tmpdir(), "fullstack-ai-tmp");
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }

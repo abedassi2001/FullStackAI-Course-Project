@@ -20,7 +20,7 @@ exports.uploadDB = async (req, res) => {
     if (!uid) return res.status(401).json({ success: false, error: "Unauthorized" });
     if (!req.file) return res.status(400).json({ success: false, error: "DB file is required" });
 
-    const buffer = fs.readFileSync(req.file.path);
+    const buffer = req.file.buffer; // multer memory storage
     const dbId = await saveDbBufferToMySQL(uid, req.file.originalname, buffer);
 
     res.json({ success: true, dbId, filename: req.file.originalname, user: uid });
@@ -94,10 +94,9 @@ exports.createDemoDB = async (req, res) => {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ success: false, error: "Unauthorized" });
 
-    // Create a temporary SQLite DB file with a simple dataset
-    const tmpDir = path.join(__dirname, "..", "uploads", "tmp");
-    fs.mkdirSync(tmpDir, { recursive: true });
-    const tmpPath = path.join(tmpDir, `demo-${Date.now()}.db`);
+    // Create a temporary SQLite DB file with a simple dataset (use OS temp dir)
+    const os = require("os");
+    const tmpPath = path.join(os.tmpdir(), `demo-${Date.now()}.db`);
 
     const db = new sqlite3.Database(tmpPath);
     await new Promise((resolve, reject) => {
@@ -122,6 +121,9 @@ exports.createDemoDB = async (req, res) => {
 
     const buffer = fs.readFileSync(tmpPath);
     const dbId = await saveDbBufferToMySQL(uid, "demo-database.db", buffer);
+
+    // cleanup temp demo file
+    try { fs.unlinkSync(tmpPath); } catch (_) {}
 
     res.json({ success: true, dbId, filename: "demo-database.db" });
   } catch (err) {

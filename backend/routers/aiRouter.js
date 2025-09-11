@@ -1,6 +1,6 @@
 // backend/routers/aiRouter.js
 const express = require("express");
-const upload = require("../middlewares/upload");
+const fs = require("fs");
 const { requireAuth } = require("../middlewares/authMiddleware");
 const { generateSQL, explainResults } = require("../services/aiService");
 const queryService = require("../services/queryService");
@@ -13,30 +13,20 @@ const {
 
 const router = express.Router();
 
-router.post("/chat", requireAuth, upload.single("dbfile"), async (req, res) => {
+router.post("/chat", requireAuth, async (req, res) => {
   try {
     const { message, dbId } = req.body || {};
-    if (!message && !req.file) {
-      return res.status(400).json({ success: false, message: "message is required" });
-    }
+    if (!message) return res.status(400).json({ success: false, message: "message is required" });
 
     const uid = req.user?.id || req.user?._id;   // <— accept both
     if (!uid) return res.status(401).json({ success: false, message: "Unauthorized" });
 
-    let dbPath = null;
+    if (!dbId) return res.status(400).json({ success: false, message: "dbId is required" });
 
-    if (req.file?.path) {
-      dbPath = req.file.path; // ad-hoc upload
-    } else {
-      if (!dbId) {
-        return res.status(400).json({ success: false, message: "dbId or dbfile is required" });
-      }
-      const row = await fetchDbBufferFromMySQL(dbId, uid);
-      if (!row) {
-        return res.status(404).json({ success: false, message: "DB not found for this user" });
-      }
-      dbPath = bufferToTempSqlite(row.file, row.filename);
-    }
+    const row = await fetchDbBufferFromMySQL(dbId, uid);
+    if (!row) return res.status(404).json({ success: false, message: "DB not found for this user" });
+
+    const dbPath = bufferToTempSqlite(row.file, row.filename);
 
     const schemaText = await getSchema(dbPath);
     const sql = (await generateSQL(message, schemaText)).trim();
@@ -55,6 +45,9 @@ router.post("/chat", requireAuth, upload.single("dbfile"), async (req, res) => {
 
     // Save prompt history (for suggestions)
     try { await queryService.createQuery(Number(uid) || 1, message); } catch (_) {}
+
+    // cleanup temp file
+    try { fs.unlinkSync(dbPath); } catch (_) {}
 
     return res.json({ success: true, sql, columns, rows, explanation });
   } catch (err) {
