@@ -16,6 +16,10 @@ async function generateSQL(prompt, schemaText, userId) {
           "For INSERT: Use proper VALUES syntax. " +
           "For UPDATE: Always include WHERE clause to prevent updating all rows. " +
           "For DELETE: Always include WHERE clause to prevent deleting all rows. " +
+          "For database metadata queries: " +
+          "- 'show tables' or 'list tables' or 'table names' → use SHOW TABLES " +
+          "- 'describe table X' or 'table structure' → use DESCRIBE table_name " +
+          "- 'show columns from X' → use SHOW COLUMNS FROM table_name " +
           "Return ONLY the SQL, no explanations or markdown. " +
           "Use MySQL syntax, not SQLite.",
       },
@@ -47,6 +51,7 @@ async function explainResults(prompt, sql, rows, operationType = 'SELECT') {
         For INSERT queries: Confirm what was added and show the new data.
         For UPDATE queries: Explain what was changed and show the affected rows.
         For DELETE queries: Confirm what was removed and show remaining data.
+        For metadata queries (SHOW TABLES, DESCRIBE, etc.): Explain what database structure information was retrieved.
         
         Be conversational, helpful, and provide context about the database operation.` 
       },
