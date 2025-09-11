@@ -9,6 +9,9 @@ export default function AIChatPage() {
   const [selectedDbId, setSelectedDbId] = useState("");
   const [databases, setDatabases] = useState([]);
   const [response, setResponse] = useState(null);
+  const [history, setHistory] = useState([]); // {role: 'user'|'assistant', content: string}
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
@@ -27,6 +30,21 @@ export default function AIChatPage() {
       }
     };
     fetchDatabases();
+  }, []);
+
+  // Fetch previous queries for suggestions
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await axios.get("http://localhost:5000/queries", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const prompts = (res.data?.data || []).map((q) => q.prompt);
+        setSuggestions(prompts.slice(0, 10));
+      } catch (_) {}
+    };
+    fetchHistory();
   }, []);
 
   const handleSubmit = async (e) => {
@@ -50,6 +68,12 @@ export default function AIChatPage() {
         }
       );
       setResponse(res.data);
+      setHistory((h) => [
+        ...h,
+        { role: "user", content: message },
+        { role: "assistant", content: res.data?.explanation || JSON.stringify(res.data?.rows) },
+      ]);
+      setMessage("");
     } catch (err) {
       setError(err.response?.data?.message || err.message);
       setResponse(null);
@@ -59,19 +83,20 @@ export default function AIChatPage() {
   };
 
   return (
-    <div className="chat-container">
-      <div className="chat-header">
-        <button 
-          className="back-btn" 
-          onClick={() => navigate("/dashboard")}
-          type="button"
-        >
-          ← Back to Dashboard
-        </button>
-        <h1>AI Chat with Database</h1>
-      </div>
+    <div className="chat-wrapper">
+      <main className="chat-card">
+        <div className="chat-header">
+          <button
+            className="btn ghost"
+            onClick={() => navigate("/dashboard")}
+            type="button"
+          >
+            ← Back to Dashboard
+          </button>
+          <h1>AI Chat with Database</h1>
+        </div>
 
-      <form onSubmit={handleSubmit} className="chat-form">
+        <form onSubmit={handleSubmit} className="chat-form">
         <div className="form-group">
           <label htmlFor="database-select">Select Database:</label>
           <select
@@ -90,23 +115,37 @@ export default function AIChatPage() {
           </select>
         </div>
 
-        <div className="form-group">
+        <div className="form-group" style={{ position: "relative" }}>
           <label htmlFor="message-input">Your Question:</label>
           <textarea
             id="message-input"
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={(e) => { setMessage(e.target.value); setShowSuggestions(true); }}
             placeholder="Ask your question about the database..."
             rows={4}
             className="message-input"
             required
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
           />
+          {showSuggestions && message && suggestions.length > 0 && (
+            <ul className="suggestions">
+              {suggestions
+                .filter((s) => s.toLowerCase().includes(message.toLowerCase()))
+                .slice(0, 5)
+                .map((s, i) => (
+                  <li key={i} onClick={() => { setMessage(s); setShowSuggestions(false); }}>{s}</li>
+                ))}
+            </ul>
+          )}
         </div>
 
-        <button type="submit" disabled={loading || !selectedDbId} className="submit-btn">
-          {loading ? "Processing..." : "Send to AI"}
-        </button>
-      </form>
+        <div className="actions">
+          <button type="submit" disabled={loading || !selectedDbId} className="btn primary" onClick={() => setShowSuggestions(false)}>
+            {loading ? "Processing..." : "Send to AI"}
+          </button>
+        </div>
+        </form>
 
       {error && <p className="error-message">{error}</p>}
 
@@ -122,6 +161,18 @@ export default function AIChatPage() {
           <p>{response.explanation}</p>
         </div>
       )}
+
+      {history.length > 0 && (
+        <div className="response-container">
+          <h2>Conversation</h2>
+          <ul className="chat-history">
+            {history.map((m, idx) => (
+              <li key={idx} className={m.role}>{m.role === "user" ? "You" : "AI"}: {m.content}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      </main>
     </div>
   );
 }
