@@ -2,7 +2,7 @@
 const express = require("express");
 const fs = require("fs");
 const { requireAuth } = require("../middlewares/authMiddleware");
-const { generateSQL, explainResults } = require("../services/aiService");
+const { generateSQL, explainResults, chat } = require("../services/aiService");
 const queryService = require("../services/queryService");
 const {
   fetchDbBufferFromMySQL,
@@ -57,3 +57,16 @@ router.post("/chat", requireAuth, async (req, res) => {
 });
 
 module.exports = router;
+
+// General conversation endpoint
+router.post("/talk", requireAuth, async (req, res) => {
+  try {
+    const { message, history } = req.body || {};
+    if (!message) return res.status(400).json({ success: false, message: "message is required" });
+    const reply = await chat(message, Array.isArray(history) ? history : []);
+    return res.json({ success: true, reply });
+  } catch (err) {
+    console.error("❌ AI talk error:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});

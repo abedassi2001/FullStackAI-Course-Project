@@ -12,6 +12,8 @@ export default function AIChatPage() {
   const [history, setHistory] = useState([]); // {role: 'user'|'assistant', content: string}
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [freeTalk, setFreeTalk] = useState("");
+  const [freeLoading, setFreeLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
@@ -82,6 +84,27 @@ export default function AIChatPage() {
     }
   };
 
+  const sendFreeTalk = async (e) => {
+    e.preventDefault();
+    if (!freeTalk || freeLoading) return;
+    try {
+      setFreeLoading(true);
+      const token = localStorage.getItem("token");
+      const res = await axios.post(
+        "http://localhost:5000/ai/talk",
+        { message: freeTalk, history },
+        { headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` } }
+      );
+      const reply = res.data?.reply || "";
+      setHistory((h) => [...h, { role: "user", content: freeTalk }, { role: "assistant", content: reply }]);
+      setFreeTalk("");
+    } catch (err) {
+      setError(err.response?.data?.message || err.message);
+    } finally {
+      setFreeLoading(false);
+    }
+  };
+
   return (
     <div className="chat-wrapper">
       <main className="chat-card">
@@ -146,6 +169,26 @@ export default function AIChatPage() {
           </button>
         </div>
         </form>
+
+      <form onSubmit={sendFreeTalk} className="chat-form" style={{ marginTop: 20 }}>
+        <div className="form-group">
+          <label htmlFor="free-input">Chat with AI:</label>
+          <input
+            id="free-input"
+            type="text"
+            className="database-select"
+            placeholder="Say anything..."
+            value={freeTalk}
+            onChange={(e) => setFreeTalk(e.target.value)}
+            disabled={freeLoading}
+          />
+        </div>
+        <div className="actions">
+          <button type="submit" className="btn ghost" disabled={freeLoading} aria-busy={freeLoading}>
+            {freeLoading ? "Thinking..." : "Send"}
+          </button>
+        </div>
+      </form>
 
       {error && <p className="error-message">{error}</p>}
 

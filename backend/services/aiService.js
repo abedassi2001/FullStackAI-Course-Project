@@ -43,3 +43,19 @@ async function explainResults(prompt, sql, rows) {
 }
 
 module.exports = { generateSQL, explainResults };
+// Add a simple general chat helper
+async function chat(prompt, context = []) {
+  const messages = [
+    { role: "system", content: "You are a helpful assistant." },
+    ...context,
+    { role: "user", content: prompt },
+  ];
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    temperature: 0.6,
+    messages,
+  });
+  return completion.choices[0].message.content.trim();
+}
+
+module.exports.chat = chat;
