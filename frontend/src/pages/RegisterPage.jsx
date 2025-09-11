@@ -81,12 +81,12 @@ export default function RegisterPage() {
       <div className="noise"></div>
 
       <header className="hero__nav">
-        <Link to="/" className="brand">FullStackAI</Link>
+        <Link to="/" className="brand">2SQL</Link>
       </header>
 
       <main className="hero__content">
         <h1 className="title">
-          Create your <span>FullStackAI</span> account ✨
+          Create your <span>2SQL</span> account ✨
         </h1>
         <p className="subtitle">
           Fill in the details below to start building and testing your projects.
@@ -163,7 +163,7 @@ export default function RegisterPage() {
       </main>
 
       <footer className="hero__footer">
-        <span>© {new Date().getFullYear()} FullStackAI</span>
+        <span>© {new Date().getFullYear()} 2SQL</span>
       </footer>
     </div>
   );

@@ -12,8 +12,7 @@ router.post("/", requireAuth, upload.single("dbfile"), ctrl.uploadDB);
 // List your saved DBs (id, filename, size, created_at)
 router.get("/", requireAuth, ctrl.listDBs);
 
-// Download a saved DB by id
-router.get("/:id/download", requireAuth, ctrl.downloadDB);
+// Download functionality removed - databases are now stored in MySQL
 
 // Preview schema (tables + columns)
 router.get("/:id/schema", requireAuth, ctrl.schemaPreview);

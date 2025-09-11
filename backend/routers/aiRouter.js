@@ -5,11 +5,9 @@ const { requireAuth } = require("../middlewares/authMiddleware");
 const { generateSQL, explainResults, chat } = require("../services/aiService");
 const queryService = require("../services/queryService");
 const {
-  fetchDbBufferFromMySQL,
-  bufferToTempSqlite,
-  runSQL,
-  getSchema,
-} = require("../services/fileDBService");
+  getDatabaseSchema,
+  executeQueryOnUserDb,
+} = require("../services/sqliteToMysqlService");
 
 const router = express.Router();
 
@@ -23,31 +21,52 @@ router.post("/chat", requireAuth, async (req, res) => {
 
     if (!dbId) return res.status(400).json({ success: false, message: "dbId is required" });
 
-    const row = await fetchDbBufferFromMySQL(dbId, uid);
-    if (!row) return res.status(404).json({ success: false, message: "DB not found for this user" });
+    console.log(`🔄 Processing AI chat request for user: ${uid}, dbId: ${dbId}`);
 
-    const dbPath = bufferToTempSqlite(row.file, row.filename);
+    // Get database schema information
+    const schemaInfo = await getDatabaseSchema(dbId, uid);
+    if (!schemaInfo) {
+      return res.status(404).json({ success: false, message: "Database not found for this user" });
+    }
 
-    const schemaText = await getSchema(dbPath);
-    const sql = (await generateSQL(message, schemaText)).trim();
+    // Create detailed schema description for AI
+    const schemaText = schemaInfo.tables.map(table => {
+      const columns = table.columns ? table.columns.map(col => `${col.name} (${col.type})`).join(', ') : 'columns not available';
+      return `Table: ${table.name} - ${table.rowCount} rows\n  Columns: ${columns}`;
+    }).join('\n\n');
 
-    if (!sql.toLowerCase().startsWith("select")) {
+    console.log(`📊 Database schema:`, schemaText);
+
+    // Generate SQL query
+    const sql = (await generateSQL(message, schemaText, uid)).trim();
+    console.log(`🔍 Generated SQL:`, sql);
+
+    // Check if it's a dangerous operation and determine operation type
+    const lowerSql = sql.toLowerCase().trim();
+    if (lowerSql.includes('drop table') || lowerSql.includes('truncate') || lowerSql.includes('delete from') && !lowerSql.includes('where')) {
       return res.status(400).json({
         success: false,
-        message: "Only SELECT statements are allowed.",
+        message: "Dangerous operations are not allowed. Use WHERE clauses for DELETE operations.",
         sql,
       });
     }
 
-    const rows = await runSQL(dbPath, sql);
+    // Execute query on MySQL database
+    const rows = await executeQueryOnUserDb(dbId, uid, sql);
     const columns = rows.length ? Object.keys(rows[0]) : [];
-    const explanation = await explainResults(message, sql, rows);
+    
+    // Determine operation type for better explanation
+    let operationType = 'SELECT';
+    if (lowerSql.startsWith('insert')) operationType = 'INSERT';
+    else if (lowerSql.startsWith('update')) operationType = 'UPDATE';
+    else if (lowerSql.startsWith('delete')) operationType = 'DELETE';
+    
+    const explanation = await explainResults(message, sql, rows, operationType);
+
+    console.log(`✅ Query executed successfully: ${rows.length} rows returned`);
 
     // Save prompt history (for suggestions)
     try { await queryService.createQuery(Number(uid) || 1, message); } catch (_) {}
-
-    // cleanup temp file
-    try { fs.unlinkSync(dbPath); } catch (_) {}
 
     return res.json({ success: true, sql, columns, rows, explanation });
   } catch (err) {
@@ -55,8 +74,6 @@ router.post("/chat", requireAuth, async (req, res) => {
     return res.status(500).json({ success: false, message: err.message });
   }
 });
-
-module.exports = router;
 
 // General conversation endpoint
 router.post("/talk", requireAuth, async (req, res) => {
@@ -70,3 +87,5 @@ router.post("/talk", requireAuth, async (req, res) => {
     return res.status(500).json({ success: false, message: err.message });
   }
 });
+
+module.exports = router;
