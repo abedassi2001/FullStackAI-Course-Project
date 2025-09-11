@@ -2,12 +2,10 @@
 const fs = require("fs");
 const path = require("path");
 const {
-  saveDbBufferToMySQL,
-  listUserDBs,
-  fetchDbBufferFromMySQL,
-  bufferToTempSqlite,
-  getSchema,
-} = require("../services/fileDBService");
+  convertSqliteToMysql,
+  getDatabaseSchema,
+  listUserDatabases,
+} = require("../services/sqliteToMysqlService");
 const sqlite3 = require("sqlite3").verbose();
 
 function getUid(req) {
@@ -20,13 +18,34 @@ exports.uploadDB = async (req, res) => {
     if (!uid) return res.status(401).json({ success: false, error: "Unauthorized" });
     if (!req.file) return res.status(400).json({ success: false, error: "DB file is required" });
 
+    console.log(`🔄 Converting SQLite database: ${req.file.originalname} for user: ${uid}`);
+    
     const buffer = req.file.buffer; // multer memory storage
-    const dbId = await saveDbBufferToMySQL(uid, req.file.originalname, buffer);
+    const result = await convertSqliteToMysql(uid, req.file.originalname, buffer);
 
-    res.json({ success: true, dbId, filename: req.file.originalname, user: uid });
+    console.log(`✅ Database converted successfully:`, {
+      dbId: result.dbId,
+      filename: result.filename,
+      tables: result.totalTables,
+      rows: result.totalRows
+    });
+
+    res.json({ 
+      success: true, 
+      dbId: result.dbId, 
+      filename: result.filename, 
+      user: uid,
+      mysqlSchemaName: result.mysqlSchemaName,
+      tables: result.tables,
+      totalTables: result.totalTables,
+      totalRows: result.totalRows
+    });
   } catch (err) {
-    console.error("Upload failed:", err);
-    res.status(500).json({ success: false, error: "Upload failed" });
+    console.error("❌ Upload failed:", err);
+    res.status(500).json({ 
+      success: false, 
+      error: "Upload failed: " + err.message 
+    });
   }
 };
 
@@ -35,35 +54,11 @@ exports.listDBs = async (req, res) => {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ success: false, error: "Unauthorized" });
 
-    const rows = await listUserDBs(uid);
-    res.json({ success: true, databases: rows });
+    const databases = await listUserDatabases(uid);
+    res.json({ success: true, databases });
   } catch (err) {
     console.error("List DBs error:", err);
     res.status(500).json({ success: false, error: "Failed to list databases" });
-  }
-};
-
-exports.downloadDB = async (req, res) => {
-  try {
-    const uid = getUid(req);
-    if (!uid) return res.status(401).json({ success: false, error: "Unauthorized" });
-
-    const dbId = parseInt(req.params.id, 10);
-    if (!dbId) return res.status(400).json({ success: false, error: "Invalid id" });
-
-    const row = await fetchDbBufferFromMySQL(dbId, uid);
-    if (!row) return res.status(404).json({ success: false, error: "Not found" });
-
-    // Sanitize filename for headers
-    const safeName = (row.filename || "database.db").replace(/[^\w.-]/g, "_");
-
-    res.setHeader("Content-Type", "application/octet-stream");
-    res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
-    res.setHeader("Content-Length", row.file.length);
-    return res.end(row.file); // send the Buffer as the body
-  } catch (err) {
-    console.error("Download error:", err);
-    res.status(500).json({ success: false, error: "Download failed" });
   }
 };
 
@@ -75,26 +70,30 @@ exports.schemaPreview = async (req, res) => {
     const dbId = parseInt(req.params.id, 10);
     if (!dbId) return res.status(400).json({ success: false, error: "Invalid id" });
 
-    const row = await fetchDbBufferFromMySQL(dbId, uid);
-    if (!row) return res.status(404).json({ success: false, error: "Not found" });
+    const schemaInfo = await getDatabaseSchema(dbId, uid);
+    if (!schemaInfo) return res.status(404).json({ success: false, error: "Database not found" });
 
-    const tmpPath = bufferToTempSqlite(row.file, row.filename);
-    const schemaText = await getSchema(tmpPath);
-
-    res.json({ success: true, filename: row.filename, schema: schemaText });
+    res.json({ 
+      success: true, 
+      filename: schemaInfo.filename || "database",
+      mysqlSchemaName: schemaInfo.mysqlSchemaName,
+      tables: schemaInfo.tables
+    });
   } catch (err) {
     console.error("Schema error:", err);
     res.status(500).json({ success: false, error: "Failed to read schema" });
   }
 };
 
-// Create a small demo SQLite DB, store it as BLOB in MySQL for this user
+// Create a small demo SQLite DB and convert it to MySQL
 exports.createDemoDB = async (req, res) => {
   try {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ success: false, error: "Unauthorized" });
 
-    // Create a temporary SQLite DB file with a simple dataset (use OS temp dir)
+    console.log(`🔄 Creating demo database for user: ${uid}`);
+
+    // Create a temporary SQLite DB file with a simple dataset
     const os = require("os");
     const tmpPath = path.join(os.tmpdir(), `demo-${Date.now()}.db`);
 
@@ -120,14 +119,28 @@ exports.createDemoDB = async (req, res) => {
     db.close();
 
     const buffer = fs.readFileSync(tmpPath);
-    const dbId = await saveDbBufferToMySQL(uid, "demo-database.db", buffer);
+    const result = await convertSqliteToMysql(uid, "demo-database.db", buffer);
 
     // cleanup temp demo file
     try { fs.unlinkSync(tmpPath); } catch (_) {}
 
-    res.json({ success: true, dbId, filename: "demo-database.db" });
+    console.log(`✅ Demo database created successfully:`, {
+      dbId: result.dbId,
+      tables: result.totalTables,
+      rows: result.totalRows
+    });
+
+    res.json({ 
+      success: true, 
+      dbId: result.dbId, 
+      filename: "demo-database.db",
+      mysqlSchemaName: result.mysqlSchemaName,
+      tables: result.tables,
+      totalTables: result.totalTables,
+      totalRows: result.totalRows
+    });
   } catch (err) {
-    console.error("Create demo DB failed:", err);
-    res.status(500).json({ success: false, error: "Failed to create demo database" });
+    console.error("❌ Create demo DB failed:", err);
+    res.status(500).json({ success: false, error: "Failed to create demo database: " + err.message });
   }
 };

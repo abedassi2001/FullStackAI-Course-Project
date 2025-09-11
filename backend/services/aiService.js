@@ -2,8 +2,8 @@
 const OpenAI = require("openai");
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Ask AI for SQL (SELECT-only, SQLite dialect)
-async function generateSQL(prompt, schemaText) {
+// Ask AI for SQL (supports SELECT, INSERT, UPDATE, DELETE)
+async function generateSQL(prompt, schemaText, userId) {
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0,
@@ -11,15 +11,19 @@ async function generateSQL(prompt, schemaText) {
       {
         role: "system",
         content:
-          "Convert natural language to a SINGLE SQLite SQL query. " +
-          "Use ONLY SELECT statements (no INSERT/UPDATE/DELETE/DDL). " +
-          "Return ONLY the SQL, no explanations or markdown.",
+          "Convert natural language to a SINGLE MySQL SQL query. " +
+          "You can use SELECT, INSERT, UPDATE, DELETE statements. " +
+          "For INSERT: Use proper VALUES syntax. " +
+          "For UPDATE: Always include WHERE clause to prevent updating all rows. " +
+          "For DELETE: Always include WHERE clause to prevent deleting all rows. " +
+          "Return ONLY the SQL, no explanations or markdown. " +
+          "Use MySQL syntax, not SQLite.",
       },
       {
         role: "user",
         content:
-          `SCHEMA (SQLite):\n${schemaText}\n\nPROMPT:\n${prompt}\n\n` +
-          "Output a single SELECT statement.",
+          `SCHEMA (MySQL):\n${schemaText}\n\nPROMPT:\n${prompt}\n\n` +
+          "Output a single SQL statement. Remember: This is for user ${userId}'s private database.",
       },
     ],
   });
@@ -29,14 +33,33 @@ async function generateSQL(prompt, schemaText) {
   return sql;
 }
 
-// Explain results
-async function explainResults(prompt, sql, rows) {
+// Explain results and provide conversational response
+async function explainResults(prompt, sql, rows, operationType = 'SELECT') {
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
-    temperature: 0.2,
+    temperature: 0.3,
     messages: [
-      { role: "system", content: "Explain SQL results in plain English briefly." },
-      { role: "user", content: `Prompt: ${prompt}\nSQL: ${sql}\nRows: ${JSON.stringify(rows).slice(0, 6000)}` },
+      { 
+        role: "system", 
+        content: `You are a helpful database assistant. Explain what you did and provide a conversational response. 
+        
+        For SELECT queries: Explain what data was retrieved and summarize the results.
+        For INSERT queries: Confirm what was added and show the new data.
+        For UPDATE queries: Explain what was changed and show the affected rows.
+        For DELETE queries: Confirm what was removed and show remaining data.
+        
+        Be conversational, helpful, and provide context about the database operation.` 
+      },
+      { 
+        role: "user", 
+        content: `User asked: "${prompt}"
+        
+SQL executed: ${sql}
+Operation type: ${operationType}
+Results: ${JSON.stringify(rows).slice(0, 6000)}
+
+Please explain what happened and provide a helpful response.` 
+      },
     ],
   });
   return completion.choices[0].message.content.trim();
@@ -59,3 +82,20 @@ async function chat(prompt, context = []) {
 }
 
 module.exports.chat = chat;
+
+// Generate SQLite DDL from a natural language spec
+async function generateDDL(spec) {
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    temperature: 0,
+    messages: [
+      { role: "system", content: "Given a natural language schema description, output pure SQLite DDL statements to create the database. Only output SQL (CREATE TABLE..., constraints). No explanations. Avoid DROP statements. Use reasonable types (INTEGER, TEXT, REAL)." },
+      { role: "user", content: spec }
+    ]
+  });
+  let ddl = completion.choices[0].message.content.trim();
+  ddl = ddl.replace(/```sql/gi, "").replace(/```/g, "").trim();
+  return ddl;
+}
+
+module.exports.generateDDL = generateDDL;

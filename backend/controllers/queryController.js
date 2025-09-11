@@ -1,6 +1,5 @@
 // backend/controllers/queryController.js
 const { validateQuery } = require("../middlewares/queryMiddleware");
-const fileDBService = require("../services/fileDBService");
 const queryService = require("../services/queryService");
 const User = require("../models/user");
 
@@ -34,8 +33,12 @@ exports.create = async (req, res) => {
       });
     }
 
-    // ▶️ Execute SQL against the saved SQLite DB
-    const results = await fileDBService.runSQL(dbFilePath, sql);
+    // Note: This endpoint is deprecated - use /ai/chat instead for database queries
+    // The old fileDBService has been replaced with MySQL-based sqliteToMysqlService
+    return res.status(400).json({
+      success: false,
+      message: "This endpoint is deprecated. Please use /ai/chat for database queries with the new MySQL-based system."
+    });
 
     // 📝 Save prompt history to MySQL (Sequelize)
     const queryHistory = await queryService.createQuery(Number(req.user.id) || 1, prompt);

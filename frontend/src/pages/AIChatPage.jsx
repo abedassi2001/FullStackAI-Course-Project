@@ -1,5 +1,5 @@
 // src/pages/AIChatPage.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./AIChatPage.css";
@@ -8,15 +8,23 @@ export default function AIChatPage() {
   const [message, setMessage] = useState("");
   const [selectedDbId, setSelectedDbId] = useState("");
   const [databases, setDatabases] = useState([]);
-  const [response, setResponse] = useState(null);
-  const [history, setHistory] = useState([]); // {role: 'user'|'assistant', content: string}
+  // const [response, setResponse] = useState(null); // Removed unused variable
+  const [history, setHistory] = useState([]); // {role: 'user'|'assistant', content: string, timestamp: Date}
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [freeTalk, setFreeTalk] = useState("");
   const [freeLoading, setFreeLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [chatMode, setChatMode] = useState("database"); // "database" or "free"
   const navigate = useNavigate();
+  const messagesEndRef = useRef(null);
+  const textareaRef = useRef(null);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [history]);
 
   // Fetch user's saved databases on component mount
   useEffect(() => {
@@ -57,7 +65,11 @@ export default function AIChatPage() {
       return;
     }
 
+    const userMessage = { role: "user", content: message, timestamp: new Date() };
+    setHistory((h) => [...h, userMessage]);
+    setMessage("");
     setLoading(true);
+
     try {
       const token = localStorage.getItem("token");
       const res = await axios.post("http://localhost:5000/ai/chat", 
@@ -69,16 +81,26 @@ export default function AIChatPage() {
           },
         }
       );
-      setResponse(res.data);
-      setHistory((h) => [
-        ...h,
-        { role: "user", content: message },
-        { role: "assistant", content: res.data?.explanation || JSON.stringify(res.data?.rows) },
-      ]);
-      setMessage("");
+      
+      const assistantMessage = {
+        role: "assistant",
+        content: res.data?.explanation || "Query executed successfully",
+        timestamp: new Date(),
+        sql: res.data?.sql,
+        rows: res.data?.rows,
+        columns: res.data?.columns
+      };
+      
+      setHistory((h) => [...h, assistantMessage]);
     } catch (err) {
+      const errorMessage = {
+        role: "assistant",
+        content: `Error: ${err.response?.data?.message || err.message}`,
+        timestamp: new Date(),
+        isError: true
+      };
+      setHistory((h) => [...h, errorMessage]);
       setError(err.response?.data?.message || err.message);
-      setResponse(null);
     } finally {
       setLoading(false);
     }
@@ -87,8 +109,13 @@ export default function AIChatPage() {
   const sendFreeTalk = async (e) => {
     e.preventDefault();
     if (!freeTalk || freeLoading) return;
+    
+    const userMessage = { role: "user", content: freeTalk, timestamp: new Date() };
+    setHistory((h) => [...h, userMessage]);
+    setFreeTalk("");
+    setFreeLoading(true);
+
     try {
-      setFreeLoading(true);
       const token = localStorage.getItem("token");
       const res = await axios.post(
         "http://localhost:5000/ai/talk",
@@ -96,126 +123,233 @@ export default function AIChatPage() {
         { headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` } }
       );
       const reply = res.data?.reply || "";
-      setHistory((h) => [...h, { role: "user", content: freeTalk }, { role: "assistant", content: reply }]);
-      setFreeTalk("");
+      const assistantMessage = { role: "assistant", content: reply, timestamp: new Date() };
+      setHistory((h) => [...h, assistantMessage]);
     } catch (err) {
+      const errorMessage = {
+        role: "assistant",
+        content: `Error: ${err.response?.data?.message || err.message}`,
+        timestamp: new Date(),
+        isError: true
+      };
+      setHistory((h) => [...h, errorMessage]);
       setError(err.response?.data?.message || err.message);
     } finally {
       setFreeLoading(false);
     }
   };
 
-  return (
-    <div className="chat-wrapper">
-      <main className="chat-card">
-        <div className="chat-header">
-          <button
-            className="btn ghost"
-            onClick={() => navigate("/dashboard")}
-            type="button"
-          >
-            ← Back to Dashboard
-          </button>
-          <h1>AI Chat with Database</h1>
-        </div>
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (chatMode === "database") {
+        handleSubmit(e);
+      } else {
+        sendFreeTalk(e);
+      }
+    }
+  };
 
-        <form onSubmit={handleSubmit} className="chat-form">
-        <div className="form-group">
-          <label htmlFor="database-select">Select Database:</label>
+  return (
+    <div className="chat-container">
+      {/* Header */}
+      <div className="chat-header">
+        <button
+          className="back-btn"
+          onClick={() => navigate("/dashboard")}
+          type="button"
+        >
+          ← Back to Dashboard
+        </button>
+        <div className="mode-tabs">
+          <button
+            className={`mode-tab ${chatMode === "database" ? "active" : ""}`}
+            onClick={() => setChatMode("database")}
+          >
+            Database Chat
+          </button>
+          <button
+            className={`mode-tab ${chatMode === "free" ? "active" : ""}`}
+            onClick={() => setChatMode("free")}
+          >
+            Free Chat
+          </button>
+        </div>
+      </div>
+
+      {/* Database Selection (only for database mode) */}
+      {chatMode === "database" && (
+        <div className="database-selector">
           <select
-            id="database-select"
             value={selectedDbId}
             onChange={(e) => setSelectedDbId(e.target.value)}
-            className="database-select"
-            required
+            className="db-select"
           >
             <option value="">Choose a database...</option>
             {databases.map((db) => (
               <option key={db.id} value={db.id}>
-                {db.filename} ({Math.round(db.bytes / 1024)}KB)
+                {db.filename} ({db.tableCount} tables, {db.totalRows} rows)
               </option>
             ))}
           </select>
         </div>
-
-        <div className="form-group" style={{ position: "relative" }}>
-          <label htmlFor="message-input">Your Question:</label>
-          <textarea
-            id="message-input"
-            value={message}
-            onChange={(e) => { setMessage(e.target.value); setShowSuggestions(true); }}
-            placeholder="Ask your question about the database..."
-            rows={4}
-            className="message-input"
-            required
-            onFocus={() => setShowSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-          />
-          {showSuggestions && message && suggestions.length > 0 && (
-            <ul className="suggestions">
-              {suggestions
-                .filter((s) => s.toLowerCase().includes(message.toLowerCase()))
-                .slice(0, 5)
-                .map((s, i) => (
-                  <li key={i} onClick={() => { setMessage(s); setShowSuggestions(false); }}>{s}</li>
-                ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="actions">
-          <button type="submit" disabled={loading || !selectedDbId} className="btn primary" onClick={() => setShowSuggestions(false)}>
-            {loading ? "Processing..." : "Send to AI"}
-          </button>
-        </div>
-        </form>
-
-      <form onSubmit={sendFreeTalk} className="chat-form" style={{ marginTop: 20 }}>
-        <div className="form-group">
-          <label htmlFor="free-input">Chat with AI:</label>
-          <input
-            id="free-input"
-            type="text"
-            className="database-select"
-            placeholder="Say anything..."
-            value={freeTalk}
-            onChange={(e) => setFreeTalk(e.target.value)}
-            disabled={freeLoading}
-          />
-        </div>
-        <div className="actions">
-          <button type="submit" className="btn ghost" disabled={freeLoading} aria-busy={freeLoading}>
-            {freeLoading ? "Thinking..." : "Send"}
-          </button>
-        </div>
-      </form>
-
-      {error && <p className="error-message">{error}</p>}
-
-      {response && (
-        <div className="response-container">
-          <h2>Generated SQL:</h2>
-          <pre>{response.sql}</pre>
-
-          <h2>Query Results:</h2>
-          <pre>{JSON.stringify(response.rows, null, 2)}</pre>
-
-          <h2>AI Explanation:</h2>
-          <p>{response.explanation}</p>
-        </div>
       )}
 
-      {history.length > 0 && (
-        <div className="response-container">
-          <h2>Conversation</h2>
-          <ul className="chat-history">
-            {history.map((m, idx) => (
-              <li key={idx} className={m.role}>{m.role === "user" ? "You" : "AI"}: {m.content}</li>
+      {/* Messages Container */}
+      <div className="messages-container">
+        {history.length === 0 ? (
+          <div className="welcome-message">
+            <h2>👋 Hi! I'm your 2SQL AI Assistant</h2>
+            <p>
+              {chatMode === "database" 
+                ? "I can help you work with your database! Ask me to:\n• Show data: 'Show me all customers'\n• Add data: 'Add a new customer named John'\n• Update data: 'Change John's city to New York'\n• Delete data: 'Remove customer with email john@test.com'\n• Analyze data: 'Which city has the most customers?'"
+                : "I'm here to help! I can answer questions, explain concepts, help with coding, or just have a friendly chat. What would you like to talk about?"
+              }
+            </p>
+          </div>
+        ) : (
+          <div className="messages">
+            {history.map((msg, idx) => (
+              <div key={idx} className={`message ${msg.role}`}>
+                <div className="message-avatar">
+                  {msg.role === "user" ? "👤" : "🤖"}
+                </div>
+                <div className="message-content">
+                  <div className="message-text">{msg.content}</div>
+                  
+                  {msg.sql && (
+                    <div className="sql-block">
+                      <div className="sql-header">🔍 SQL Query:</div>
+                      <pre className="sql-code">{msg.sql}</pre>
+                    </div>
+                  )}
+                  
+                  {msg.rows && msg.rows.length > 0 && (
+                    <div className="results-block">
+                      <div className="results-header">📊 Data ({msg.rows.length} rows):</div>
+                      <div className="results-table">
+                        <table>
+                          <thead>
+                            <tr>
+                              {msg.columns?.map((col, i) => (
+                                <th key={i}>{col}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {msg.rows.slice(0, 10).map((row, i) => (
+                              <tr key={i}>
+                                {msg.columns?.map((col, j) => (
+                                  <td key={j}>{JSON.stringify(row[col])}</td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {msg.rows.length > 10 && (
+                          <div className="results-footer">
+                            Showing first 10 of {msg.rows.length} rows
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="message-time">
+                    {msg.timestamp.toLocaleTimeString()}
+                  </div>
+                </div>
+              </div>
             ))}
-          </ul>
+            {(loading || freeLoading) && (
+              <div className="message assistant">
+                <div className="message-avatar">🤖</div>
+                <div className="message-content">
+                  <div className="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </div>
+
+      {/* Input Area */}
+      <div className="input-container">
+        <form onSubmit={chatMode === "database" ? handleSubmit : sendFreeTalk} className="input-form">
+          <div className="input-wrapper">
+            <textarea
+              ref={textareaRef}
+              value={chatMode === "database" ? message : freeTalk}
+              onChange={(e) => {
+                if (chatMode === "database") {
+                  setMessage(e.target.value);
+                  setShowSuggestions(true);
+                } else {
+                  setFreeTalk(e.target.value);
+                }
+              }}
+              onKeyPress={handleKeyPress}
+              placeholder={
+                chatMode === "database" 
+                  ? "Ask a question about your database..." 
+                  : "Message AI..."
+              }
+              className="message-input"
+              rows={1}
+              disabled={loading || freeLoading}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            />
+            <button
+              type="submit"
+              disabled={
+                loading || 
+                freeLoading || 
+                (chatMode === "database" ? !message || !selectedDbId : !freeTalk)
+              }
+              className="send-btn"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M7 11L12 6L17 11M12 18V7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          </div>
+        </form>
+        
+        {/* Suggestions */}
+        {showSuggestions && chatMode === "database" && message && suggestions.length > 0 && (
+          <div className="suggestions">
+            {suggestions
+              .filter((s) => s.toLowerCase().includes(message.toLowerCase()))
+              .slice(0, 5)
+              .map((s, i) => (
+                <div 
+                  key={i} 
+                  className="suggestion-item"
+                  onClick={() => { 
+                    setMessage(s); 
+                    setShowSuggestions(false);
+                    textareaRef.current?.focus();
+                  }}
+                >
+                  {s}
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="error-message">
+          {error}
         </div>
       )}
-      </main>
     </div>
   );
 }
