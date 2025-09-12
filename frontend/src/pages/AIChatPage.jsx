@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import QueryTemplates from "../components/QueryTemplates";
 import "./AIChatPage.css";
 
 export default function AIChatPage() {
@@ -13,6 +14,8 @@ export default function AIChatPage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [suggestionLoading, setSuggestionLoading] = useState(false);
+  const [suggestionTimeout, setSuggestionTimeout] = useState(null);
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -40,7 +43,54 @@ export default function AIChatPage() {
     fetchDatabases();
   }, []);
 
-  // Fetch previous queries for suggestions
+  // Fetch smart suggestions based on current input
+  const fetchSuggestions = async (query, dbId) => {
+    if (query.length < 1) {
+      setSuggestions([]);
+      return;
+    }
+    
+    setSuggestionLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const params = new URLSearchParams({ q: query });
+      if (dbId) params.append('dbId', dbId);
+      
+      const res = await axios.get(`http://localhost:5000/ai/suggestions?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (res.data.success) {
+        setSuggestions(res.data.suggestions || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch suggestions:", err);
+      // Fallback to basic suggestions
+      setSuggestions([
+        "Show me all customers",
+        "Find products with price over 100",
+        "Add a new customer",
+        "Create a products table"
+      ]);
+    } finally {
+      setSuggestionLoading(false);
+    }
+  };
+
+  // Debounced suggestion fetching
+  const debouncedFetchSuggestions = (query, dbId) => {
+    if (suggestionTimeout) {
+      clearTimeout(suggestionTimeout);
+    }
+    
+    const timeout = setTimeout(() => {
+      fetchSuggestions(query, dbId);
+    }, 300); // 300ms delay
+    
+    setSuggestionTimeout(timeout);
+  };
+
+  // Fetch previous queries for initial suggestions
   useEffect(() => {
     const fetchHistory = async () => {
       try {
@@ -54,6 +104,15 @@ export default function AIChatPage() {
     };
     fetchHistory();
   }, []);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (suggestionTimeout) {
+        clearTimeout(suggestionTimeout);
+      }
+    };
+  }, [suggestionTimeout]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -127,6 +186,13 @@ export default function AIChatPage() {
     }
   };
 
+  // Handle template selection
+  const handleTemplateSelect = (templateText) => {
+    setMessage(templateText);
+    setShowSuggestions(false);
+    textareaRef.current?.focus();
+  };
+
   return (
     <div className="chat-container">
       {/* Header */}
@@ -160,11 +226,19 @@ export default function AIChatPage() {
       {/* Messages Container */}
       <div className="messages-container">
         {history.length === 0 ? (
-          <div className="welcome-message">
-            <h2>👋 Hi! I'm your 2SQL AI Assistant</h2>
-            <p>
-              I can help you work with your database and answer any questions! Ask me to:\n• Show data: 'Show me all customers'\n• Add data: 'Add a new customer named John'\n• Update data: 'Change John's city to New York'\n• Delete data: 'Remove customer with email john@test.com'\n• Create tables: 'Create a table for products with name, price, and category'\n• Analyze data: 'Which city has the most customers?'\n• Create schemas: 'Create a school database with teachers and students'\n• General questions: 'What is SQL?' or 'How do I optimize my database?'
-            </p>
+          <div className="welcome-section">
+            <div className="welcome-message">
+              <h2>👋 Hi! I'm your 2SQL AI Assistant</h2>
+              <p>
+                I can help you work with your database and answer any questions! I understand natural language and can convert your requests into SQL queries.
+              </p>
+            </div>
+            
+            {/* Query Templates */}
+            <QueryTemplates 
+              onSelectTemplate={handleTemplateSelect}
+              selectedDbId={selectedDbId}
+            />
           </div>
         ) : (
           <div className="messages">
@@ -255,8 +329,12 @@ export default function AIChatPage() {
               ref={textareaRef}
               value={message}
               onChange={(e) => {
-                setMessage(e.target.value);
+                const newValue = e.target.value;
+                setMessage(newValue);
                 setShowSuggestions(true);
+                
+                // Fetch smart suggestions as user types
+                debouncedFetchSuggestions(newValue, selectedDbId);
               }}
               onKeyPress={handleKeyPress}
               placeholder="Ask a question about your database, create new tables, or ask me anything..."
@@ -281,25 +359,41 @@ export default function AIChatPage() {
           </div>
         </form>
         
-        {/* Suggestions */}
-        {showSuggestions && message && suggestions.length > 0 && (
+        {/* Enhanced Suggestions */}
+        {showSuggestions && suggestions.length > 0 && (
           <div className="suggestions">
-            {suggestions
-              .filter((s) => s.toLowerCase().includes(message.toLowerCase()))
-              .slice(0, 5)
-              .map((s, i) => (
+            <div className="suggestions-header">
+              <span>💡 Smart Suggestions</span>
+              {suggestionLoading && <span className="loading-indicator">Loading...</span>}
+            </div>
+            {suggestions.slice(0, 6).map((suggestion, i) => {
+              // Highlight matching text
+              const highlightMatch = (text, query) => {
+                if (!query || query.length < 2) return text;
+                const regex = new RegExp(`(${query})`, 'gi');
+                return text.replace(regex, '<mark>$1</mark>');
+              };
+              
+              return (
                 <div 
                   key={i} 
                   className="suggestion-item"
                   onClick={() => { 
-                    setMessage(s); 
+                    setMessage(suggestion); 
                     setShowSuggestions(false);
                     textareaRef.current?.focus();
                   }}
-                >
-                  {s}
-                </div>
-              ))}
+                  dangerouslySetInnerHTML={{
+                    __html: highlightMatch(suggestion, message)
+                  }}
+                />
+              );
+            })}
+            {suggestions.length === 0 && !suggestionLoading && (
+              <div className="suggestion-item no-suggestions">
+                Start typing to get smart suggestions...
+              </div>
+            )}
           </div>
         )}
       </div>

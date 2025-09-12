@@ -25,9 +25,9 @@ async function detectIntent(message, hasDatabase = false) {
         
         Intent definitions:
         - "general_chat": Any conversational message, questions about concepts, greetings, thanks, etc.
-        - "database_query": Questions about existing data (SELECT, INSERT, UPDATE, DELETE operations)
+        - "database_query": Questions about existing data (SELECT, INSERT, UPDATE, DELETE operations on existing tables)
         - "create_schema": Creating a new database with multiple tables
-        - "create_table": Creating a single table
+        - "create_table": Creating a single new table
         
         Guidelines:
         - If user is asking about data in a database, use "database_query"
@@ -37,12 +37,25 @@ async function detectIntent(message, hasDatabase = false) {
         - Be liberal with "general_chat" - when in doubt, choose general chat
         - "requiresDatabase" should be true only for database_query intent
         
+        IMPORTANT: Distinguish between INSERT and CREATE TABLE:
+        - "Add a new [record]" when table exists → database_query (INSERT)
+        - "Create a [table] table" → create_table (CREATE TABLE)
+        - "Add [table] with [fields]" when table exists → database_query (INSERT)
+        - "Create [table] with [fields]" → create_table (CREATE TABLE)
+        - "Create a schema called X" → create_table (CREATE TABLE with name X)
+        - "Create random tables" → create_table (CREATE TABLE)
+        
         Examples:
         - "hello" → general_chat
         - "what is SQL?" → general_chat  
         - "show me all customers" → database_query
+        - "add a new customer" → database_query (INSERT)
         - "create a users table" → create_table
         - "create a school database" → create_schema
+        - "add a new album with title and artist" → database_query (INSERT)
+        - "create an album table" → create_table
+        - "create a schema called abedtest" → create_table
+        - "create random tables" → create_table
         - "thanks" → general_chat
         - "looks good" → general_chat`
       },

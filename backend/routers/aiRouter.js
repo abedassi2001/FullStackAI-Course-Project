@@ -5,6 +5,7 @@ const { requireAuth } = require("../middlewares/authMiddleware");
 const { generateSQL, explainResults, chat } = require("../services/aiService");
 const { detectIntent } = require("../services/intentRouter");
 const queryService = require("../services/queryService");
+const { getRealtimeSuggestions } = require("../services/querySuggestionsService");
 const {
   getDatabaseSchema,
   executeQueryOnUserDb,
@@ -242,6 +243,41 @@ router.post("/chat", requireAuth, async (req, res) => {
   }
 });
 
-
+// GET /ai/suggestions - Get real-time query suggestions
+router.get("/suggestions", requireAuth, async (req, res) => {
+  try {
+    const { q: query = '', dbId } = req.query;
+    const uid = req.user?.id || req.user?._id;
+    
+    if (!uid) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+    
+    let schemaInfo = null;
+    
+    // Get database schema if dbId is provided
+    if (dbId) {
+      try {
+        schemaInfo = await getDatabaseSchema(dbId, uid);
+      } catch (err) {
+        console.log('Could not fetch schema for suggestions:', err.message);
+      }
+    }
+    
+    // Get suggestions
+    const suggestions = await getRealtimeSuggestions(query, uid, schemaInfo);
+    
+    res.json({
+      success: true,
+      suggestions,
+      query: query,
+      dbId: dbId || null
+    });
+    
+  } catch (err) {
+    console.error("❌ Suggestions error:", err);
+    res.status(500).json({ success: false, message: "Failed to get suggestions" });
+  }
+});
 
 module.exports = router;

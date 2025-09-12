@@ -236,9 +236,14 @@
   z-index: 5;
 }
 
+.welcome-section {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
 .welcome-message {
   text-align: center;
-  padding: 3rem 1.5rem;
+  padding: 2rem 1.5rem 1rem 1.5rem;
   max-width: 600px;
   margin: 0 auto;
 }
@@ -603,7 +608,7 @@
   height: 20px;
 }
 
-/* Suggestions */
+/* Enhanced Suggestions */
 .suggestions {
   position: absolute;
   top: 100%;
@@ -615,8 +620,32 @@
   margin-top: 8px;
   box-shadow: 0 8px 24px rgba(0,0,0,.3);
   z-index: 20;
-  max-height: 200px;
+  max-height: 300px;
   overflow-y: auto;
+  backdrop-filter: blur(10px);
+}
+
+.suggestions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(124,92,255,.1) 0%, rgba(41,182,246,.1) 100%);
+  border-bottom: 1px solid var(--ring);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.loading-indicator {
+  font-size: 0.8rem;
+  color: var(--muted);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
 
 .suggestion-item {
@@ -626,15 +655,63 @@
   border-bottom: 1px solid rgba(36,49,74,.3);
   font-size: 0.9rem;
   transition: all 0.2s ease;
+  position: relative;
+  line-height: 1.4;
 }
 
 .suggestion-item:hover {
   background: rgba(124,92,255,.1);
   color: var(--text);
+  transform: translateX(4px);
 }
 
 .suggestion-item:last-child {
   border-bottom: none;
+}
+
+.suggestion-item.no-suggestions {
+  color: var(--muted);
+  font-style: italic;
+  cursor: default;
+}
+
+.suggestion-item.no-suggestions:hover {
+  background: transparent;
+  transform: none;
+}
+
+/* Highlight matching text */
+.suggestion-item mark {
+  background: linear-gradient(135deg, rgba(124,92,255,.3) 0%, rgba(41,182,246,.3) 100%);
+  color: var(--primary);
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+/* Suggestion categories */
+.suggestion-item[data-category="select"] {
+  border-left: 3px solid #4CAF50;
+}
+
+.suggestion-item[data-category="insert"] {
+  border-left: 3px solid #2196F3;
+}
+
+.suggestion-item[data-category="update"] {
+  border-left: 3px solid #FF9800;
+}
+
+.suggestion-item[data-category="delete"] {
+  border-left: 3px solid #F44336;
+}
+
+.suggestion-item[data-category="create"] {
+  border-left: 3px solid #9C27B0;
+}
+
+.suggestion-item[data-category="metadata"] {
+  border-left: 3px solid #607D8B;
 }
 
 /* Responsive Design */
