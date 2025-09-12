@@ -17,7 +17,7 @@
 
 .hero {
   min-height: 100vh;
-  background:
+    background:
     radial-gradient(95% 85% at 70% 20%, rgba(124,92,255,.28) 0%, rgba(41,182,246,.14) 35%, rgba(7,10,18,1) 70%),
     radial-gradient(80% 60% at 18% 85%, rgba(41,182,246,.22) 0%, rgba(7,10,18,1) 60%);
   position: relative;
@@ -119,13 +119,19 @@
   text-decoration: none;
   font-size: 2rem;
   font-weight: 800;
-  color: var(--text);
+  transition: all 0.3s ease;
+}
+
+.brand:hover {
+  transform: translateY(-2px) scale(1.05);
+  filter: drop-shadow(0 4px 12px rgba(124, 92, 255, 0.4));
 }
 
 .brand-icon {
   width: 48px;
   height: 48px;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
+  background: linear-gradient(45deg, #ff6b6b, #ffd93d, #6bcf7f, #4d9de0, #9b59b6);
+  background-size: 300% 300%;
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -134,13 +140,37 @@
   font-size: 1.5rem;
   font-weight: 900;
   box-shadow: var(--glow);
+  animation: rainbow 3s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
 .brand-text {
-  background: linear-gradient(135deg, var(--text) 0%, var(--primary-2) 100%);
+  background: linear-gradient(135deg, #ff6b6b 0%, #ffd93d 25%, #6bcf7f 50%, #4d9de0 75%, #9b59b6 100%);
+  background-size: 200% 200%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  animation: gradient-shift 4s ease-in-out infinite;
+}
+
+@keyframes rainbow {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
 }
 
 .nav-links {
