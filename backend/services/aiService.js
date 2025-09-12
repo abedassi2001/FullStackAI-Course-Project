@@ -34,6 +34,8 @@ QUERY EXAMPLES BY CATEGORY:
 - "Add a new customer named John Smith" → INSERT INTO customers (name) VALUES ('John Smith');
 - "Create a new product with name 'Laptop' and price 999" → INSERT INTO products (name, price) VALUES ('Laptop', 999);
 - "Add a new employee with name 'Alice' and department 'IT'" → INSERT INTO employees (name, department) VALUES ('Alice', 'IT');
+- "Add a new customer with id 1, name 'John', email 'john@test.com', city 'New York'" → INSERT INTO customers (id, name, email, city) VALUES (1, 'John', 'john@test.com', 'New York');
+- "Insert a new album with title 'Greatest Hits' and artistId 5" → INSERT INTO album (Title, ArtistId) VALUES ('Greatest Hits', 5);
 
 ✏️ UPDATE QUERIES (Modify Data):
 - "Change John's city to Los Angeles" → UPDATE customers SET city = 'Los Angeles' WHERE name = 'John';
@@ -65,6 +67,8 @@ IMPORTANT RULES:
 4. Use proper foreign key constraints when creating related tables
 5. Return ONLY the SQL query, no explanations or markdown formatting
 6. Use MySQL syntax, not SQLite
+7. ONLY use tables that exist in the provided schema - never create INSERT/UPDATE/DELETE queries for non-existent tables
+8. For INSERT queries, provide actual values instead of placeholders (?, ?, ?)
 
 COMMON PATTERNS TO RECOGNIZE:
 - "Show me" / "Display" / "Get" / "Find" → SELECT
@@ -87,6 +91,13 @@ IMPORTANT DISTINCTION:
 COMPOUND REQUESTS:
 - "Create a schema called X and add an item" → CREATE TABLE X (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
 - "Create random tables then add data" → CREATE TABLE sample_data (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+
+CRITICAL: 
+- ONLY use tables that exist in the provided schema
+- NEVER generate INSERT/UPDATE/DELETE queries for non-existent tables
+- Always provide actual values in INSERT queries, never use placeholders (?, ?, ?)
+- If a table doesn't exist, suggest creating it first with CREATE TABLE
+- For INSERT queries, always provide sample values like: INSERT INTO customers (name, email) VALUES ('John Doe', 'john@example.com')
 
 Return ONLY the SQL query, no explanations.`
       },
