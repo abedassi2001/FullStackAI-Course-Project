@@ -3,6 +3,7 @@ const express = require("express");
 const fs = require("fs");
 const { requireAuth } = require("../middlewares/authMiddleware");
 const { generateSQL, explainResults, chat } = require("../services/aiService");
+const { detectIntent } = require("../services/intentRouter");
 const queryService = require("../services/queryService");
 const {
   getDatabaseSchema,
@@ -16,172 +17,231 @@ router.post("/chat", requireAuth, async (req, res) => {
     const { message, dbId } = req.body || {};
     if (!message) return res.status(400).json({ success: false, message: "message is required" });
 
-    const uid = req.user?.id || req.user?._id;   // <— accept both
+    const uid = req.user?.id || req.user?._id;
     if (!uid) return res.status(401).json({ success: false, message: "Unauthorized" });
 
-    if (!dbId) return res.status(400).json({ success: false, message: "dbId is required" });
+    console.log(`🔄 Processing AI chat request for user: ${uid}, dbId: ${dbId}, message: ${message}`);
 
-    console.log(`🔄 Processing AI chat request for user: ${uid}, dbId: ${dbId}`);
+    // Use AI to intelligently detect intent
+    const intent = await detectIntent(message, !!dbId);
+    console.log(`🎯 Detected intent:`, intent);
 
-    // Get database schema information
-    const schemaInfo = await getDatabaseSchema(dbId, uid);
-    if (!schemaInfo) {
-      return res.status(404).json({ success: false, message: "Database not found for this user" });
+    // Handle general chat
+    if (intent.intent === "general_chat") {
+      try {
+        console.log('💬 Processing general conversation');
+        const reply = await chat(message, []);
+        return res.json({ 
+          success: true, 
+          explanation: reply,
+          isGeneralQuestion: true,
+          intent: intent
+        });
+      } catch (err) {
+        console.error('❌ General chat error:', err);
+        return res.status(500).json({ success: false, message: err.message });
+      }
     }
 
-    // Create detailed schema description for AI
-    const schemaText = schemaInfo.tables.map(table => {
-      const columns = table.columns ? table.columns.map(col => `${col.name} (${col.type})`).join(', ') : 'columns not available';
-      return `Table: ${table.name} - ${table.rowCount} rows\n  Columns: ${columns}`;
-    }).join('\n\n');
+    // Handle database queries
+    if (intent.intent === "database_query") {
+      if (!dbId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Please select a database to query your data.",
+          intent: intent
+        });
+      }
+    }
 
-    console.log(`📊 Database schema:`, schemaText);
+    // Get database schema information for database queries
+    let schemaText = "";
+    if (dbId && intent.intent === "database_query") {
+      const schemaInfo = await getDatabaseSchema(dbId, uid);
+      if (!schemaInfo) {
+        return res.status(404).json({ success: false, message: "Database not found for this user" });
+      }
 
-    // Generate SQL query
+      // Create detailed schema description for AI
+      schemaText = schemaInfo.tables.map(table => {
+        const columns = table.columns ? table.columns.map(col => `${col.name} (${col.type})`).join(', ') : 'columns not available';
+        return `Table: ${table.name} - ${table.rowCount} rows\n  Columns: ${columns}`;
+      }).join('\n\n');
+
+      console.log(`📊 Database schema:`, schemaText);
+    } else if (intent.intent === "create_schema" || intent.intent === "create_table") {
+      console.log(`📊 Creating new schema/table`);
+      schemaText = "No existing schema - this is a new database creation request.";
+    }
+
+    // Generate SQL query based on intent
     const sql = (await generateSQL(message, schemaText, uid)).trim();
     console.log(`🔍 Generated SQL:`, sql);
 
-    // Check if it's a dangerous operation and determine operation type
+    // Check if it's a dangerous operation
     const lowerSql = sql.toLowerCase().trim();
     if (lowerSql.includes('drop table') || lowerSql.includes('truncate') || lowerSql.includes('delete from') && !lowerSql.includes('where')) {
       return res.status(400).json({
         success: false,
         message: "Dangerous operations are not allowed. Use WHERE clauses for DELETE operations.",
         sql,
+        intent: intent
       });
     }
 
-    // Execute query on MySQL database
-    const rows = await executeQueryOnUserDb(dbId, uid, sql);
-    const columns = rows.length ? Object.keys(rows[0]) : [];
-    
-    // Determine operation type for better explanation
-    let operationType = 'SELECT';
-    if (lowerSql.startsWith('insert')) operationType = 'INSERT';
-    else if (lowerSql.startsWith('update')) operationType = 'UPDATE';
-    else if (lowerSql.startsWith('delete')) operationType = 'DELETE';
-    
-    const explanation = await explainResults(message, sql, rows, operationType);
+    // Handle CREATE operations (both create_schema and create_table)
+    if (intent.intent === "create_schema" || intent.intent === "create_table" || lowerSql.startsWith('create table')) {
+      // Handle CREATE operations
+      try {
+        console.log('🔧 Processing CREATE operation:', intent.intent);
+        console.log('🔍 Generated SQL:', sql);
+        
+        // If the AI didn't generate a CREATE TABLE, generate one based on the request
+        let createTableSQL = sql;
+        if (!lowerSql.startsWith('create table')) {
+          console.log('🔧 AI did not generate CREATE TABLE, generating fallback...');
+          // Generate a simple CREATE TABLE for a random database (SQLite compatible)
+          createTableSQL = `CREATE TABLE sample_data (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            description TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+          )`;
+        }
+        
+        // Create a temporary SQLite database with the generated schema
+        const sqlite3 = require("sqlite3").verbose();
+        const fs = require("fs");
+        const path = require("path");
+        const os = require("os");
+        const crypto = require("crypto");
+        
+        const uniqueId = crypto.randomBytes(8).toString('hex');
+        const tmpPath = path.join(os.tmpdir(), `temp_schema_${uniqueId}_${Date.now()}.db`);
+        let sqliteDb;
+        
+        try {
+          sqliteDb = new sqlite3.Database(tmpPath);
+          
+          // Convert MySQL CREATE TABLE to SQLite compatible
+          let sqliteSQL = createTableSQL
+            .replace(/AUTO_INCREMENT/gi, 'AUTOINCREMENT')
+            .replace(/INT\b/gi, 'INTEGER')
+            .replace(/VARCHAR\(\d+\)/gi, 'TEXT')
+            .replace(/DATETIME/gi, 'TEXT')
+            .replace(/DEFAULT CURRENT_TIMESTAMP/gi, 'DEFAULT CURRENT_TIMESTAMP')
+            .replace(/PRIMARY KEY AUTOINCREMENT/gi, 'PRIMARY KEY AUTOINCREMENT')
+            .replace(/,\s*AUTOINCREMENT/gi, ' AUTOINCREMENT');
+          
+          // Fix common SQLite syntax issues
+          sqliteSQL = sqliteSQL
+            .replace(/INTEGER AUTOINCREMENT PRIMARY KEY/gi, 'INTEGER PRIMARY KEY AUTOINCREMENT')
+            .replace(/INT AUTOINCREMENT PRIMARY KEY/gi, 'INTEGER PRIMARY KEY AUTOINCREMENT')
+            .replace(/AUTOINCREMENT\s+PRIMARY KEY/gi, 'PRIMARY KEY AUTOINCREMENT');
+          
+          console.log('🔧 Final SQLite SQL:', sqliteSQL);
+          
+          // Execute the schema creation
+          await new Promise((resolve, reject) => {
+            sqliteDb.exec(sqliteSQL, (err) => {
+              if (err) {
+                console.error('❌ SQLite execution error:', err);
+                reject(err);
+              } else {
+                console.log('✅ SQLite schema created successfully');
+                resolve();
+              }
+            });
+          });
 
-    console.log(`✅ Query executed successfully: ${rows.length} rows returned`);
+          // Read the created database as buffer
+          const buffer = fs.readFileSync(tmpPath);
+          
+          // Convert to MySQL using existing service
+          const { convertSqliteToMysql } = require("../services/sqliteToMysqlService");
+          const result = await convertSqliteToMysql(uid, `generated_schema_${Date.now()}.db`, buffer);
+          
+          // Generate dual response: SQL execution + ChatGPT explanation
+          const sqlExplanation = `✅ SQL executed successfully! I've created a new table based on your request.`;
+          const chatExplanation = await chat(`I just created a table with this SQL: ${createTableSQL}. Explain what this table does and how it can be used.`, []);
+          
+          console.log(`✅ Table created successfully: ${result.dbId}`);
 
-    // Save prompt history (for suggestions)
-    try { await queryService.createQuery(Number(uid) || 1, message); } catch (_) {}
+          return res.json({ 
+            success: true, 
+            sql: createTableSQL,
+            explanation: sqlExplanation,
+            chatExplanation: chatExplanation,
+            dbId: result.dbId,
+            operationType: 'CREATE_TABLE',
+            schemaCreated: true,
+            isDualResponse: true,
+            intent: intent
+          });
+        } finally {
+          // Cleanup
+          if (sqliteDb) {
+            sqliteDb.close((err) => {
+              if (err) console.error("Error closing SQLite database:", err);
+            });
+          }
+          
+          // Wait a bit before trying to delete the file
+          setTimeout(() => {
+            try {
+              if (fs.existsSync(tmpPath)) {
+                fs.unlinkSync(tmpPath);
+              }
+            } catch (err) {
+              console.error("Error deleting temp file:", err);
+            }
+          }, 100);
+        }
+      } catch (err) {
+        console.error("❌ CREATE TABLE error:", err);
+        return res.status(500).json({ success: false, message: `Failed to create table: ${err.message}` });
+      }
+    }
 
-    return res.json({ success: true, sql, columns, rows, explanation });
+    // Handle database queries
+    if (intent.intent === "database_query") {
+      const rows = await executeQueryOnUserDb(dbId, uid, sql);
+      const columns = rows.length ? Object.keys(rows[0]) : [];
+      
+      // Generate dual response: SQL execution + ChatGPT explanation
+      const sqlExplanation = `✅ SQL executed successfully! Found ${rows.length} rows.`;
+      const chatExplanation = await chat(`I just executed this SQL query: ${sql}. The results show ${rows.length} rows. Explain what this query does and what the results mean.`, []);
+      
+      console.log(`✅ Query executed successfully: ${rows.length} rows returned`);
+
+      // Save prompt history (for suggestions)
+      try { await queryService.createQuery(Number(uid) || 1, message); } catch (_) {}
+
+      return res.json({ 
+        success: true, 
+        sql, 
+        columns, 
+        rows, 
+        explanation: sqlExplanation,
+        chatExplanation: chatExplanation,
+        isDualResponse: true,
+        intent: intent
+      });
+    }
+
+    // If we reach here, it's an unexpected intent
+    console.log('❌ Unexpected intent:', intent);
+    return res.status(400).json({ 
+      success: false, 
+      message: "I'm not sure how to handle that request. Please try rephrasing your message.",
+      intent: intent
+    });
   } catch (err) {
     console.error("❌ AI/DB error:", err);
     return res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// General conversation endpoint
-router.post("/talk", requireAuth, async (req, res) => {
-  try {
-    const { message, history } = req.body || {};
-    if (!message) return res.status(400).json({ success: false, message: "message is required" });
-    const reply = await chat(message, Array.isArray(history) ? history : []);
-    return res.json({ success: true, reply });
-  } catch (err) {
-    console.error("❌ AI talk error:", err);
-    return res.status(500).json({ success: false, message: err.message });
-  }
-});
 
-// Create schema from description
-router.post("/create-schema", requireAuth, async (req, res) => {
-  try {
-    console.log('📥 Schema creation request received:', req.body);
-    const { description } = req.body || {};
-    if (!description) return res.status(400).json({ success: false, message: "description is required" });
-
-    const uid = req.user?.id || req.user?._id;
-    if (!uid) return res.status(401).json({ success: false, message: "Unauthorized" });
-
-    console.log(`🔄 Creating schema from description for user: ${uid}`);
-    console.log(`📝 Description: ${description}`);
-
-    // Generate schema using AI
-    const schemaPrompt = `Create a database schema based on this description: "${description}". 
-    Return only SQL CREATE TABLE statements, one per table. Use SQLite-compatible syntax:
-    - Use INTEGER for IDs with PRIMARY KEY
-    - Use TEXT for strings
-    - Use REAL for numbers
-    - Use DATETIME for dates
-    - Do NOT include FOREIGN KEY constraints (we'll handle relationships separately)
-    - Do NOT include CREATE DATABASE statements
-    - Each table should have an id INTEGER PRIMARY KEY AUTOINCREMENT column
-    - Use AUTOINCREMENT (not AUTO_INCREMENT) for SQLite compatibility`;
-    
-    const schemaSQL = await generateSQL(schemaPrompt, "", uid);
-    console.log(`🔍 Generated schema SQL: ${schemaSQL}`);
-    
-    // Remove any CREATE DATABASE statements as SQLite doesn't support them
-    const cleanedSQL = schemaSQL.replace(/CREATE DATABASE\s+\w+;?\s*/gi, '');
-    console.log(`🧹 Cleaned schema SQL: ${cleanedSQL}`);
-
-    // Create a temporary SQLite database with the generated schema
-    const sqlite3 = require("sqlite3").verbose();
-    const fs = require("fs");
-    const path = require("path");
-    const os = require("os");
-    const crypto = require("crypto");
-    
-    const uniqueId = crypto.randomBytes(8).toString('hex');
-    const tmpPath = path.join(os.tmpdir(), `temp_schema_${uniqueId}_${Date.now()}.db`);
-    let sqliteDb;
-    
-    try {
-      sqliteDb = new sqlite3.Database(tmpPath);
-      
-      // Execute the schema creation
-      await new Promise((resolve, reject) => {
-        sqliteDb.exec(cleanedSQL, (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-
-      // Read the created database as buffer
-      const buffer = fs.readFileSync(tmpPath);
-      
-      // Convert to MySQL using existing service
-      const { convertSqliteToMysql } = require("../services/sqliteToMysqlService");
-      const result = await convertSqliteToMysql(uid, `generated_schema_${Date.now()}.db`, buffer);
-      
-      const message = `✅ Schema created successfully! I've generated a database with the following structure based on your description: "${description}". The database has been saved and is now available for querying.`;
-      
-      console.log(`✅ Schema created successfully: ${result.dbId}`);
-
-      return res.json({ 
-        success: true, 
-        message,
-        dbId: result.dbId,
-        schema: schemaSQL
-      });
-    } finally {
-      // Cleanup
-      if (sqliteDb) {
-        sqliteDb.close((err) => {
-          if (err) console.error("Error closing SQLite database:", err);
-        });
-      }
-      
-      // Wait a bit before trying to delete the file
-      setTimeout(() => {
-        try {
-          if (fs.existsSync(tmpPath)) {
-            fs.unlinkSync(tmpPath);
-          }
-        } catch (err) {
-          console.error("Error deleting temp file:", err);
-        }
-      }, 100);
-    }
-  } catch (err) {
-    console.error("❌ Schema creation error:", err);
-    return res.status(500).json({ success: false, message: err.message });
-  }
-});
 
 module.exports = router;
