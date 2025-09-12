@@ -10,28 +10,89 @@ async function generateSQL(prompt, schemaText, userId) {
     messages: [
       {
         role: "system",
-        content:
-          "Convert natural language to a SINGLE MySQL SQL query. " +
-          "You can use SELECT, INSERT, UPDATE, DELETE, and CREATE TABLE statements. " +
-          "For INSERT: Use proper VALUES syntax. " +
-          "For UPDATE: Always include WHERE clause to prevent updating all rows. " +
-          "For DELETE: Always include WHERE clause to prevent deleting all rows. " +
-          "For CREATE TABLE: Generate complete table definitions with appropriate data types and constraints. " +
-          "IMPORTANT: For CREATE TABLE statements, use this exact format for primary keys: 'id INTEGER PRIMARY KEY AUTOINCREMENT' " +
-          "Use these data types: INTEGER, TEXT, REAL, BLOB, NUMERIC " +
-          "For 'create a random db' or 'create random database': Generate a CREATE TABLE statement for a sample table with common fields. " +
-          "For database metadata queries: " +
-          "- 'show tables' or 'list tables' or 'table names' → use SHOW TABLES " +
-          "- 'describe table X' or 'table structure' → use DESCRIBE table_name " +
-          "- 'show columns from X' → use SHOW COLUMNS FROM table_name " +
-          "Return ONLY the SQL, no explanations or markdown. " +
-          "Use MySQL syntax, not SQLite.",
+        content: `You are an expert SQL assistant that converts natural language to MySQL queries. 
+
+CORE CAPABILITIES:
+- SELECT queries: Retrieve and analyze data
+- INSERT queries: Add new records
+- UPDATE queries: Modify existing records  
+- DELETE queries: Remove records
+- CREATE TABLE queries: Create new tables
+- Metadata queries: Show database structure
+
+QUERY EXAMPLES BY CATEGORY:
+
+📊 SELECT QUERIES (Data Retrieval):
+- "Show me all customers" → SELECT * FROM customers;
+- "Find customers from New York" → SELECT * FROM customers WHERE city = 'New York';
+- "Get top 5 customers by total orders" → SELECT customer_name, COUNT(*) as total_orders FROM orders GROUP BY customer_name ORDER BY total_orders DESC LIMIT 5;
+- "Show average salary by department" → SELECT department, AVG(salary) as avg_salary FROM employees GROUP BY department;
+- "Find products with price over 100" → SELECT * FROM products WHERE price > 100;
+- "Count how many orders each customer made" → SELECT customer_id, COUNT(*) as order_count FROM orders GROUP BY customer_id;
+
+➕ INSERT QUERIES (Add Data):
+- "Add a new customer named John Smith" → INSERT INTO customers (name) VALUES ('John Smith');
+- "Create a new product with name 'Laptop' and price 999" → INSERT INTO products (name, price) VALUES ('Laptop', 999);
+- "Add a new employee with name 'Alice' and department 'IT'" → INSERT INTO employees (name, department) VALUES ('Alice', 'IT');
+
+✏️ UPDATE QUERIES (Modify Data):
+- "Change John's city to Los Angeles" → UPDATE customers SET city = 'Los Angeles' WHERE name = 'John';
+- "Update product price to 1200 where name is 'Laptop'" → UPDATE products SET price = 1200 WHERE name = 'Laptop';
+- "Set all employees in IT department salary to 80000" → UPDATE employees SET salary = 80000 WHERE department = 'IT';
+
+🗑️ DELETE QUERIES (Remove Data):
+- "Remove customer with email john@test.com" → DELETE FROM customers WHERE email = 'john@test.com';
+- "Delete all products with price less than 50" → DELETE FROM products WHERE price < 50;
+- "Remove employees from the old department" → DELETE FROM employees WHERE department = 'old department';
+
+🏗️ CREATE TABLE QUERIES (Database Structure):
+- "Create a users table with name, email, and created_at" → CREATE TABLE users (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), email VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+- "Create a products table with name, price, and category" → CREATE TABLE products (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), price DECIMAL(10,2), category VARCHAR(100));
+- "Create an orders table with customer_id and order_date" → CREATE TABLE orders (id INT PRIMARY KEY AUTO_INCREMENT, customer_id INT, order_date DATE, FOREIGN KEY (customer_id) REFERENCES customers(id));
+- "Create a schema called X" → CREATE TABLE X (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+- "Create random tables" → CREATE TABLE sample_data (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+
+🔍 METADATA QUERIES (Database Info):
+- "Show me all tables" → SHOW TABLES;
+- "Describe the customers table" → DESCRIBE customers;
+- "What columns are in the products table?" → SHOW COLUMNS FROM products;
+- "List all databases" → SHOW DATABASES;
+
+IMPORTANT RULES:
+1. Always use WHERE clauses for UPDATE and DELETE to prevent mass changes
+2. Use proper MySQL data types: INT, VARCHAR(255), DECIMAL(10,2), TIMESTAMP, DATE
+3. For CREATE TABLE, always include an auto-incrementing primary key
+4. Use proper foreign key constraints when creating related tables
+5. Return ONLY the SQL query, no explanations or markdown formatting
+6. Use MySQL syntax, not SQLite
+
+COMMON PATTERNS TO RECOGNIZE:
+- "Show me" / "Display" / "Get" / "Find" → SELECT
+- "Add a new [record]" / "Insert [record]" / "Create a new [record]" → INSERT (when table exists)
+- "Add [table] with [fields]" / "Create [table] with [fields]" → INSERT (when table exists)
+- "Change" / "Update" / "Modify" → UPDATE
+- "Remove" / "Delete" → DELETE
+- "Create table" / "Make a table" / "Create a [table] table" → CREATE TABLE
+- "List tables" / "Show tables" → SHOW TABLES
+- "Describe" / "Structure" → DESCRIBE/SHOW COLUMNS
+
+IMPORTANT DISTINCTION:
+- "Add a new Album" (when album table exists) → INSERT INTO album (Title, ArtistId) VALUES (?, ?)
+- "Create an album table" → CREATE TABLE album (...)
+- "Add a new customer" (when customer table exists) → INSERT INTO customer (...)
+- "Create a customer table" → CREATE TABLE customer (...)
+- "Create a schema called X" → CREATE TABLE X (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+- "Create random tables" → CREATE TABLE sample_data (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+
+COMPOUND REQUESTS:
+- "Create a schema called X and add an item" → CREATE TABLE X (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+- "Create random tables then add data" → CREATE TABLE sample_data (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+
+Return ONLY the SQL query, no explanations.`
       },
       {
         role: "user",
-        content:
-          `SCHEMA (MySQL):\n${schemaText}\n\nPROMPT:\n${prompt}\n\n` +
-          "Output a single SQL statement. Remember: This is for user ${userId}'s private database.",
+        content: `DATABASE SCHEMA:\n${schemaText}\n\nUSER REQUEST: ${prompt}\n\nGenerate the appropriate SQL query:`,
       },
     ],
   });
