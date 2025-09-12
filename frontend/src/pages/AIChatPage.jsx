@@ -1,4 +1,4 @@
-// src/pages/AIChatPage.jsx
+// src/pages/AIChatPage.jsx - Updated to remove freeLoading references
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -8,16 +8,11 @@ export default function AIChatPage() {
   const [message, setMessage] = useState("");
   const [selectedDbId, setSelectedDbId] = useState("");
   const [databases, setDatabases] = useState([]);
-  // const [response, setResponse] = useState(null); // Removed unused variable
   const [history, setHistory] = useState([]); // {role: 'user'|'assistant', content: string, timestamp: Date}
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [freeTalk, setFreeTalk] = useState("");
-  const [freeLoading, setFreeLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [chatMode, setChatMode] = useState("database"); // "database" or "free"
-  const [isCreatingSchema, setIsCreatingSchema] = useState(false);
   const navigate = useNavigate();
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -64,98 +59,12 @@ export default function AIChatPage() {
     e.preventDefault();
     setError("");
     
-    // Check if this is a schema creation request
-    const lowerMessage = message.toLowerCase();
-    
-    // Only treat as schema creation if:
-    // 1. Checkbox is checked, OR
-    // 2. Message explicitly mentions creating/building/making a schema, OR
-    // 3. Message contains schema creation keywords but NOT query keywords
-    const hasSchemaCreationKeywords = lowerMessage.includes('create schema') || 
-                                     lowerMessage.includes('create a schema') ||
-                                     lowerMessage.includes('make a schema') ||
-                                     lowerMessage.includes('build a schema') ||
-                                     lowerMessage.includes('design a schema') ||
-                                     lowerMessage.includes('create random schema') ||
-                                     lowerMessage.includes('generate schema') ||
-                                     lowerMessage.includes('new schema');
-    
-    const hasQueryKeywords = lowerMessage.includes('show') || 
-                            lowerMessage.includes('select') || 
-                            lowerMessage.includes('get') || 
-                            lowerMessage.includes('find') || 
-                            lowerMessage.includes('list') ||
-                            lowerMessage.includes('display') ||
-                            lowerMessage.includes('query');
-    
-    const isSchemaRequest = isCreatingSchema || 
-                           (hasSchemaCreationKeywords && !hasQueryKeywords);
-
-    console.log('Message:', message);
-    console.log('Is creating schema checkbox:', isCreatingSchema);
-    console.log('Has schema creation keywords:', hasSchemaCreationKeywords);
-    console.log('Has query keywords:', hasQueryKeywords);
-    console.log('Is schema request:', isSchemaRequest);
-
-    if (isSchemaRequest) {
-      // Handle schema creation
-      const userMessage = { role: "user", content: message, timestamp: new Date() };
-      setHistory((h) => [...h, userMessage]);
-      setMessage("");
-      setLoading(true);
-
-      try {
-        console.log('Sending schema creation request...');
-        const token = localStorage.getItem("token");
-        const res = await axios.post("http://localhost:5000/ai/create-schema", 
-          { description: message },
-          {
-            headers: { 
-              "Content-Type": "application/json", 
-              Authorization: `Bearer ${token}` 
-            }
-          }
-        );
-        
-        console.log('Schema creation response:', res.data);
-        
-        const assistantMessage = { 
-          role: "assistant", 
-          content: res.data.message, 
-          timestamp: new Date(),
-          schemaCreated: true,
-          dbId: res.data.dbId
-        };
-        setHistory((h) => [...h, assistantMessage]);
-        
-        // Refresh databases list
-        fetchDatabases();
-      } catch (err) {
-        console.error('Schema creation error:', err);
-        const errorMessage = {
-          role: "assistant",
-          content: `Error: ${err.response?.data?.message || err.message}`,
-          timestamp: new Date(),
-          isError: true
-        };
-        setHistory((h) => [...h, errorMessage]);
-        setError(err.response?.data?.message || err.message);
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-
-    // Regular database query
     if (!message) {
       setError("Message is required.");
       return;
     }
     
-    if (!selectedDbId && !isCreatingSchema) {
-      setError("Please select a database to query, or check 'Create Schema' to create a new database.");
-      return;
-    }
+    // Let the AI backend handle all routing intelligently
 
     const userMessage = { role: "user", content: message, timestamp: new Date() };
     setHistory((h) => [...h, userMessage]);
@@ -164,8 +73,9 @@ export default function AIChatPage() {
 
     try {
       const token = localStorage.getItem("token");
+      console.log('🚀 Sending request:', { message, dbId: selectedDbId || null });
       const res = await axios.post("http://localhost:5000/ai/chat", 
-        { message, dbId: selectedDbId },
+        { message, dbId: selectedDbId || null },
         {
           headers: {
             "Content-Type": "application/json",
@@ -180,10 +90,20 @@ export default function AIChatPage() {
         timestamp: new Date(),
         sql: res.data?.sql,
         rows: res.data?.rows,
-        columns: res.data?.columns
+        columns: res.data?.columns,
+        schemaCreated: res.data?.schemaCreated || false,
+        dbId: res.data?.dbId,
+        isDualResponse: res.data?.isDualResponse || false,
+        chatExplanation: res.data?.chatExplanation,
+        isGeneralQuestion: res.data?.isGeneralQuestion || false
       };
       
       setHistory((h) => [...h, assistantMessage]);
+      
+      // Refresh databases list if a schema was created
+      if (res.data?.schemaCreated) {
+        fetchDatabases();
+      }
     } catch (err) {
       const errorMessage = {
         role: "assistant",
@@ -198,48 +118,12 @@ export default function AIChatPage() {
     }
   };
 
-  const sendFreeTalk = async (e) => {
-    e.preventDefault();
-    if (!freeTalk || freeLoading) return;
-    
-    const userMessage = { role: "user", content: freeTalk, timestamp: new Date() };
-    setHistory((h) => [...h, userMessage]);
-    setFreeTalk("");
-    setFreeLoading(true);
-
-    try {
-      const token = localStorage.getItem("token");
-      const res = await axios.post(
-        "http://localhost:5000/ai/talk",
-        { message: freeTalk, history },
-        { headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` } }
-      );
-      const reply = res.data?.reply || "";
-      const assistantMessage = { role: "assistant", content: reply, timestamp: new Date() };
-      setHistory((h) => [...h, assistantMessage]);
-    } catch (err) {
-      const errorMessage = {
-        role: "assistant",
-        content: `Error: ${err.response?.data?.message || err.message}`,
-        timestamp: new Date(),
-        isError: true
-      };
-      setHistory((h) => [...h, errorMessage]);
-      setError(err.response?.data?.message || err.message);
-    } finally {
-      setFreeLoading(false);
-    }
-  };
 
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (chatMode === "database") {
-        handleSubmit(e);
-      } else {
-        sendFreeTalk(e);
-      }
+      handleSubmit(e);
     }
   };
 
@@ -254,59 +138,23 @@ export default function AIChatPage() {
         >
           ← Back to Dashboard
         </button>
-        <div className="mode-tabs">
-          <button
-            className={`mode-tab ${chatMode === "database" ? "active" : ""}`}
-            onClick={() => setChatMode("database")}
-          >
-            Database Chat
-          </button>
-          <button
-            className={`mode-tab ${chatMode === "free" ? "active" : ""}`}
-            onClick={() => setChatMode("free")}
-          >
-            Free Chat
-          </button>
-        </div>
       </div>
 
-      {/* Database Selection (only for database mode) */}
-      {chatMode === "database" && (
-        <div className="database-selector">
-          <select
-            value={selectedDbId}
-            onChange={(e) => setSelectedDbId(e.target.value)}
-            className="db-select"
-          >
-            <option value="">Choose a database...</option>
-            {databases.map((db) => (
-              <option key={db.id} value={db.id}>
-                {db.filename} ({db.tableCount} tables, {db.totalRows} rows)
-              </option>
-            ))}
-          </select>
-          
-          <div className="schema-creation-option">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={isCreatingSchema}
-                onChange={(e) => {
-                  setIsCreatingSchema(e.target.checked);
-                  if (e.target.checked) {
-                    setSelectedDbId(""); // Clear database selection when creating schema
-                  }
-                }}
-                className="checkbox-input"
-              />
-              <span className="checkbox-text">Create New Schema</span>
-            </label>
-            <p className="checkbox-description">
-              Check this to create a new database schema instead of querying an existing one
-            </p>
-          </div>
-        </div>
-      )}
+      {/* Database Selection */}
+      <div className="database-selector">
+        <select
+          value={selectedDbId}
+          onChange={(e) => setSelectedDbId(e.target.value)}
+          className="db-select"
+        >
+          <option value="">Choose a database...</option>
+          {databases.map((db) => (
+            <option key={db.id} value={db.id}>
+              {db.filename} ({db.tableCount} tables, {db.totalRows} rows)
+            </option>
+          ))}
+        </select>
+      </div>
 
 
       {/* Messages Container */}
@@ -315,10 +163,7 @@ export default function AIChatPage() {
           <div className="welcome-message">
             <h2>👋 Hi! I'm your 2SQL AI Assistant</h2>
             <p>
-              {chatMode === "database" 
-                ? "I can help you work with your database! Ask me to:\n• Show data: 'Show me all customers'\n• Add data: 'Add a new customer named John'\n• Update data: 'Change John's city to New York'\n• Delete data: 'Remove customer with email john@test.com'\n• Analyze data: 'Which city has the most customers?'\n• Create schemas: 'Create a school database with teachers and students'"
-                : "I'm here to help! I can answer questions, explain concepts, help with coding, or just have a friendly chat. What would you like to talk about?"
-              }
+              I can help you work with your database and answer any questions! Ask me to:\n• Show data: 'Show me all customers'\n• Add data: 'Add a new customer named John'\n• Update data: 'Change John's city to New York'\n• Delete data: 'Remove customer with email john@test.com'\n• Create tables: 'Create a table for products with name, price, and category'\n• Analyze data: 'Which city has the most customers?'\n• Create schemas: 'Create a school database with teachers and students'\n• General questions: 'What is SQL?' or 'How do I optimize my database?'
             </p>
           </div>
         ) : (
@@ -331,6 +176,7 @@ export default function AIChatPage() {
                 <div className="message-content">
                   <div className="message-text">{msg.content}</div>
                   
+                  {/* SQL Query Block */}
                   {msg.sql && (
                     <div className="sql-block">
                       <div className="sql-header">🔍 SQL Query:</div>
@@ -338,6 +184,7 @@ export default function AIChatPage() {
                     </div>
                   )}
                   
+                  {/* Data Results Block */}
                   {msg.rows && msg.rows.length > 0 && (
                     <div className="results-block">
                       <div className="results-header">📊 Data ({msg.rows.length} rows):</div>
@@ -369,13 +216,21 @@ export default function AIChatPage() {
                     </div>
                   )}
                   
+                  {/* ChatGPT Explanation Block (for dual responses) */}
+                  {msg.isDualResponse && msg.chatExplanation && (
+                    <div className="chat-explanation-block">
+                      <div className="chat-explanation-header">🤖 AI Explanation:</div>
+                      <div className="chat-explanation-text">{msg.chatExplanation}</div>
+                    </div>
+                  )}
+                  
                   <div className="message-time">
                     {msg.timestamp.toLocaleTimeString()}
                   </div>
                 </div>
               </div>
             ))}
-            {(loading || freeLoading) && (
+            {loading && (
               <div className="message assistant">
                 <div className="message-avatar">🤖</div>
                 <div className="message-content">
@@ -394,32 +249,20 @@ export default function AIChatPage() {
 
       {/* Input Area */}
       <div className="input-container">
-        <form onSubmit={
-          chatMode === "database" ? handleSubmit : sendFreeTalk
-        } className="input-form">
+        <form onSubmit={handleSubmit} className="input-form">
           <div className="input-wrapper">
             <textarea
               ref={textareaRef}
-              value={chatMode === "database" ? message : freeTalk}
+              value={message}
               onChange={(e) => {
-                if (chatMode === "database") {
-                  setMessage(e.target.value);
-                  setShowSuggestions(true);
-                } else {
-                  setFreeTalk(e.target.value);
-                }
+                setMessage(e.target.value);
+                setShowSuggestions(true);
               }}
               onKeyPress={handleKeyPress}
-              placeholder={
-                chatMode === "database" 
-                  ? (isCreatingSchema 
-                      ? "Describe the schema you want to create..." 
-                      : "Ask a question about your database...")
-                  : "Message AI..."
-              }
+              placeholder="Ask a question about your database, create new tables, or ask me anything..."
               className="message-input"
               rows={1}
-              disabled={loading || freeLoading}
+              disabled={loading}
               onFocus={() => setShowSuggestions(true)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
             />
@@ -427,8 +270,7 @@ export default function AIChatPage() {
               type="submit"
               disabled={
                 loading || 
-                freeLoading ||
-                (chatMode === "database" ? !message || (!selectedDbId && !isCreatingSchema) : !freeTalk)
+                !message
               }
               className="send-btn"
             >
@@ -440,7 +282,7 @@ export default function AIChatPage() {
         </form>
         
         {/* Suggestions */}
-        {showSuggestions && chatMode === "database" && message && suggestions.length > 0 && (
+        {showSuggestions && message && suggestions.length > 0 && (
           <div className="suggestions">
             {suggestions
               .filter((s) => s.toLowerCase().includes(message.toLowerCase()))
