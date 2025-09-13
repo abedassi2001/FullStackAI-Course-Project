@@ -20,6 +20,18 @@ async function testSchemaNameExtraction() {
       expected: "user_data"
     },
     {
+      input: "create db called 'user_data'",
+      expected: "user_data"
+    },
+    {
+      input: "create a db named test",
+      expected: "test"
+    },
+    {
+      input: "make a db called myapp",
+      expected: "myapp"
+    },
+    {
       input: "make a schema named products_db",
       expected: "products_db"
     },

@@ -105,8 +105,9 @@ router.post("/chat", requireAuth, async (req, res) => {
         let createTableSQL = sql;
         if (!lowerSql.startsWith('create table')) {
           console.log('🔧 AI did not generate CREATE TABLE, generating fallback...');
-          // Generate a simple CREATE TABLE for a random database (SQLite compatible)
-          createTableSQL = `CREATE TABLE sample_data (
+          // Use the extracted schema name as the table name, or fallback to a generic name
+          const tableName = requestedSchemaName || 'sample_data';
+          createTableSQL = `CREATE TABLE ${tableName} (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
             description TEXT,
