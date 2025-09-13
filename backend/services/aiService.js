@@ -77,6 +77,7 @@ COMMON PATTERNS TO RECOGNIZE:
 - "Change" / "Update" / "Modify" → UPDATE
 - "Remove" / "Delete" → DELETE
 - "Create table" / "Make a table" / "Create a [table] table" → CREATE TABLE
+- "Create schema" / "Create database" / "Create db" → CREATE TABLE (for schema creation)
 - "List tables" / "Show tables" → SHOW TABLES
 - "Describe" / "Structure" → DESCRIBE/SHOW COLUMNS
 
@@ -86,6 +87,8 @@ IMPORTANT DISTINCTION:
 - "Add a new customer" (when customer table exists) → INSERT INTO customer (...)
 - "Create a customer table" → CREATE TABLE customer (...)
 - "Create a schema called X" → CREATE TABLE X (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+- "Create a database called X" → CREATE TABLE X (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+- "Create a db called X" → CREATE TABLE X (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
 - "Create random tables" → CREATE TABLE sample_data (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
 
 COMPOUND REQUESTS:
@@ -98,6 +101,8 @@ CRITICAL:
 - Always provide actual values in INSERT queries, never use placeholders (?, ?, ?)
 - If a table doesn't exist, suggest creating it first with CREATE TABLE
 - For INSERT queries, always provide sample values like: INSERT INTO customers (name, email) VALUES ('John Doe', 'john@example.com')
+- When user says "create a schema called X" or "create a database called X" or "create a db called X", use X as the table name in CREATE TABLE X
+- When user says "create random tables" or "create a table" without specifying a name, use "sample_data" as the table name
 
 Return ONLY the SQL query, no explanations.`
       },
@@ -177,8 +182,11 @@ async function extractSchemaName(prompt) {
         - "create schema X" 
         - "create database X"
         - "create a database called X"
+        - "create db X"
+        - "create a db called X"
         - "make a schema named X"
         - "build a database with name X"
+        - "make a db named X"
 
         Return ONLY the extracted name, or "null" if no specific name is mentioned.
         Clean the name by removing quotes, special characters, and keeping only alphanumeric characters and underscores.
@@ -187,6 +195,9 @@ async function extractSchemaName(prompt) {
         - "create a schema called my_database" → "my_database"
         - "create schema test123" → "test123"
         - "create database called 'user_data'" → "user_data"
+        - "create db called 'user_data'" → "user_data"
+        - "create a db named test" → "test"
+        - "make a db called myapp" → "myapp"
         - "create random tables" → "null"
         - "create a table" → "null"`
       },
