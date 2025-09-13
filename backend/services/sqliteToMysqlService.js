@@ -37,6 +37,22 @@ async function initializeMySQL() {
   }
 }
 
+// Lightweight availability check for controllers to preflight without throwing
+async function isMySQLAvailable() {
+  // If a pool already exists and schema is ready or can be pinged, consider available
+  try {
+    if (pool) {
+      const conn = await pool.getConnection();
+      await conn.ping();
+      conn.release();
+      return true;
+    }
+  } catch (_) {
+    // fall through to initialize
+  }
+  return initializeMySQL();
+}
+
 // Ensure schema tables exist
 let schemaReady = false;
 async function ensureSchema() {
@@ -256,13 +272,20 @@ async function convertTableToMySQL(sqliteDb, tableName, mysqlTableName, dbId, sc
 }
 
 // Main function to convert SQLite database to MySQL
-async function convertSqliteToMysql(userId, filename, sqliteBuffer) {
+async function convertSqliteToMysql(userId, filename, sqliteBuffer, customSchemaName = null) {
   await ensureSchema();
   
   // Create unique schema name for this user's database (shorter name)
-  const timestamp = Date.now().toString().slice(-8); // Last 8 digits
-  const baseName = filename.replace(/\.db$/i, '').replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 10); // Max 10 chars
-  const mysqlSchemaName = `u${userId.slice(-6)}_${baseName}_${timestamp}`;
+  let mysqlSchemaName;
+  if (customSchemaName) {
+    // Use custom schema name if provided, but sanitize it
+    mysqlSchemaName = customSchemaName.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 64); // MySQL schema name limit
+  } else {
+    // Generate default name if no custom name provided
+    const timestamp = Date.now().toString().slice(-8); // Last 8 digits
+    const baseName = filename.replace(/\.db$/i, '').replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 10); // Max 10 chars
+    mysqlSchemaName = `u${userId.slice(-6)}_${baseName}_${timestamp}`;
+  }
   
   // Create the MySQL schema (database)
   await pool.execute(`CREATE DATABASE IF NOT EXISTS \`${mysqlSchemaName}\``);
@@ -495,5 +518,6 @@ module.exports = {
   executeQueryOnUserDb,
   listUserDatabases,
   ensureSchema,
-  initializeMySQL
+  initializeMySQL,
+  isMySQLAvailable
 };

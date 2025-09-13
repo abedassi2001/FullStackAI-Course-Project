@@ -5,6 +5,7 @@ const {
   convertSqliteToMysql,
   getDatabaseSchema,
   listUserDatabases,
+  isMySQLAvailable,
 } = require("../services/sqliteToMysqlService");
 const sqlite3 = require("sqlite3").verbose();
 
@@ -17,6 +18,15 @@ exports.uploadDB = async (req, res) => {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ success: false, error: "Unauthorized" });
     if (!req.file) return res.status(400).json({ success: false, error: "DB file is required" });
+
+    // Preflight MySQL availability to avoid throwing with unclear error
+    const mysqlOk = await isMySQLAvailable();
+    if (!mysqlOk) {
+      return res.status(503).json({
+        success: false,
+        error: "MySQL is not available. Check MYSQL_HOST/PORT/USER/PASSWORD env vars and server permissions.",
+      });
+    }
 
     console.log(`🔄 Converting SQLite database: ${req.file.originalname} for user: ${uid}`);
     
@@ -92,6 +102,15 @@ exports.createDemoDB = async (req, res) => {
     if (!uid) return res.status(401).json({ success: false, error: "Unauthorized" });
 
     console.log(`🔄 Creating demo database for user: ${uid}`);
+
+    // Preflight MySQL availability to avoid creating temp files when DB is down
+    const mysqlOk = await isMySQLAvailable();
+    if (!mysqlOk) {
+      return res.status(503).json({
+        success: false,
+        error: "MySQL is not available. Check MYSQL_HOST/PORT/USER/PASSWORD env vars and server permissions.",
+      });
+    }
 
     // Create a temporary SQLite DB file with a simple dataset
     const os = require("os");

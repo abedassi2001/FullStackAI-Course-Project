@@ -2,7 +2,7 @@
 const express = require("express");
 const fs = require("fs");
 const { requireAuth } = require("../middlewares/authMiddleware");
-const { generateSQL, explainResults, chat } = require("../services/aiService");
+const { generateSQL, explainResults, chat, extractSchemaName } = require("../services/aiService");
 const { detectIntent } = require("../services/intentRouter");
 const queryService = require("../services/queryService");
 const { getRealtimeSuggestions } = require("../services/querySuggestionsService");
@@ -97,6 +97,10 @@ router.post("/chat", requireAuth, async (req, res) => {
         console.log('🔧 Processing CREATE operation:', intent.intent);
         console.log('🔍 Generated SQL:', sql);
         
+        // Extract schema name from user request
+        const requestedSchemaName = await extractSchemaName(message);
+        console.log('🔍 Extracted schema name:', requestedSchemaName);
+        
         // If the AI didn't generate a CREATE TABLE, generate one based on the request
         let createTableSQL = sql;
         if (!lowerSql.startsWith('create table')) {
@@ -160,13 +164,14 @@ router.post("/chat", requireAuth, async (req, res) => {
           
           // Convert to MySQL using existing service
           const { convertSqliteToMysql } = require("../services/sqliteToMysqlService");
-          const result = await convertSqliteToMysql(uid, `generated_schema_${Date.now()}.db`, buffer);
+          const result = await convertSqliteToMysql(uid, `generated_schema_${Date.now()}.db`, buffer, requestedSchemaName);
           
           // Generate dual response: SQL execution + ChatGPT explanation
-          const sqlExplanation = `✅ SQL executed successfully! I've created a new table based on your request.`;
-          const chatExplanation = await chat(`I just created a table with this SQL: ${createTableSQL}. Explain what this table does and how it can be used.`, []);
+          const schemaName = result.mysqlSchemaName;
+          const sqlExplanation = ` SQL executed successfully! I've created a new table in schema "${schemaName}" based on your request.`;
+          const chatExplanation = await chat(`I just created a table with this SQL: ${createTableSQL} in schema "${schemaName}". Explain what this table does and how it can be used.`, []);
           
-          console.log(`✅ Table created successfully: ${result.dbId}`);
+          console.log(`Table created successfully: ${result.dbId} with schema name: ${schemaName}`);
 
           return res.json({ 
             success: true, 
@@ -174,6 +179,7 @@ router.post("/chat", requireAuth, async (req, res) => {
             explanation: sqlExplanation,
             chatExplanation: chatExplanation,
             dbId: result.dbId,
+            schemaName: schemaName,
             operationType: 'CREATE_TABLE',
             schemaCreated: true,
             isDualResponse: true,

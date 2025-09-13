@@ -162,4 +162,43 @@ async function chat(prompt, context = []) {
   return completion.choices[0].message.content.trim();
 }
 
-module.exports = { generateSQL, explainResults, chat };
+// Extract schema name from user request
+async function extractSchemaName(prompt) {
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    temperature: 0,
+    messages: [
+      {
+        role: "system",
+        content: `You are a schema name extractor. Extract the schema/database name from user requests.
+
+        Look for patterns like:
+        - "create a schema called X"
+        - "create schema X" 
+        - "create database X"
+        - "create a database called X"
+        - "make a schema named X"
+        - "build a database with name X"
+
+        Return ONLY the extracted name, or "null" if no specific name is mentioned.
+        Clean the name by removing quotes, special characters, and keeping only alphanumeric characters and underscores.
+
+        Examples:
+        - "create a schema called my_database" → "my_database"
+        - "create schema test123" → "test123"
+        - "create database called 'user_data'" → "user_data"
+        - "create random tables" → "null"
+        - "create a table" → "null"`
+      },
+      {
+        role: "user",
+        content: `Extract schema name from: "${prompt}"`
+      }
+    ],
+  });
+
+  const extractedName = completion.choices[0].message.content.trim();
+  return extractedName === "null" ? null : extractedName;
+}
+
+module.exports = { generateSQL, explainResults, chat, extractSchemaName };
