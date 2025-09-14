@@ -62,11 +62,11 @@ export default function LoginPage() {
       <div className="noise"></div>
 
       <header className="hero__nav">
-        <Link to="/" className="brand">FullStackAI</Link>
+        <Link to="/" className="brand">2SQL</Link>
       </header>
 
       <main className="hero__content">
-        <h1 className="title">Sign in to <span>FullStackAI</span> 🔑</h1>
+        <h1 className="title">Sign in to <span>2SQL</span> 🔑</h1>
         <p className="subtitle">Enter your email and password to access your account.</p>
 
         <form className="login-form" onSubmit={handleSubmit}>
@@ -106,7 +106,7 @@ export default function LoginPage() {
       </main>
 
       <footer className="hero__footer">
-        <span>© {new Date().getFullYear()} FullStackAI</span>
+        <span>© {new Date().getFullYear()} 2SQL</span>
       </footer>
     </div>
   );

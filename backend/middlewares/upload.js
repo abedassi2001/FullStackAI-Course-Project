@@ -1,15 +1,7 @@
 // backend/middleware/upload.js
 const multer = require("multer");
-const path = require("path");
-
-// Save uploaded DB files to /uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(__dirname, "../uploads")),
-  filename: (req, file, cb) => {
-    const uniqueName = Date.now() + "-" + file.originalname;
-    cb(null, uniqueName);
-  }
-});
+// Use memory storage to avoid writing to the project directory
+const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
   if (file.mimetype === "application/x-sqlite3" || file.originalname.endsWith(".db")) {
@@ -19,6 +11,6 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const upload = multer({ storage, fileFilter });
+const upload = multer({ storage, fileFilter, limits: { fileSize: 50 * 1024 * 1024 } });
 
 module.exports = upload;
