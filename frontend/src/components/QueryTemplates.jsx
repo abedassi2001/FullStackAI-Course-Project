@@ -11,6 +11,7 @@ const QueryTemplates = ({ onSelectTemplate, selectedDbId }) => {
       { text: "Find products with price over 100", category: "select", icon: "🔍" },
       { text: "Add a new customer named John", category: "insert", icon: "➕" },
       { text: "Create a products table", category: "create", icon: "🏗️" },
+      { text: "Build a database from this data", category: "build", icon: "🏗️" },
       { text: "Show me all tables", category: "metadata", icon: "📋" },
       { text: "Update customer city to New York", category: "update", icon: "✏️" },
       { text: "Remove customer with email test@example.com", category: "delete", icon: "🗑️" },
@@ -78,6 +79,18 @@ const QueryTemplates = ({ onSelectTemplate, selectedDbId }) => {
       { text: "Show me the distribution of customer ages", category: "analysis", icon: "📊" },
       { text: "Find outliers in product prices", category: "analysis", icon: "🎯" },
       { text: "What's the average order value by month?", category: "analysis", icon: "📅" }
+    ],
+    build: [
+      { text: "Build a database from this data", category: "build", icon: "🏗️" },
+      { text: "Create a database from this CSV data", category: "build", icon: "📊" },
+      { text: "Make a database with this JSON data", category: "build", icon: "📋" },
+      { text: "Build a customer database from this data", category: "build", icon: "👥" },
+      { text: "Create a product catalog database", category: "build", icon: "📦" },
+      { text: "Build an employee management database", category: "build", icon: "👩‍💼" },
+      { text: "Create a school database with students and teachers", category: "build", icon: "🏫" },
+      { text: "Build a blog database with posts and comments", category: "build", icon: "📝" },
+      { text: "Create an e-commerce database from this data", category: "build", icon: "🛒" },
+      { text: "Build a library management database", category: "build", icon: "📚" }
     ]
   };
 
@@ -88,6 +101,7 @@ const QueryTemplates = ({ onSelectTemplate, selectedDbId }) => {
     { key: 'update', label: 'Change Data', icon: '✏️' },
     { key: 'delete', label: 'Remove Data', icon: '🗑️' },
     { key: 'create', label: 'Create Tables', icon: '🏗️' },
+    { key: 'build', label: 'Build Database', icon: '🏗️' },
     { key: 'metadata', label: 'Database Info', icon: '📋' },
     { key: 'analysis', label: 'Analysis', icon: '📊' }
   ];

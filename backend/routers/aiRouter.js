@@ -10,8 +10,29 @@ const {
   getDatabaseSchema,
   executeQueryOnUserDb,
 } = require("../services/sqliteToMysqlService");
+const { buildDatabaseFromData } = require("../services/databaseBuilderService");
 
 const router = express.Router();
+
+// Helper function to generate sample data from description
+async function generateSampleDataFromDescription(description) {
+  const { chat } = require("../services/aiService");
+  
+  const completion = await chat(`Based on this description: "${description}", generate realistic sample data in JSON format. 
+    Create 3-5 sample records that would be typical for this type of data. 
+    Return ONLY a JSON array of objects, no explanations.`, []);
+  
+  try {
+    return JSON.parse(completion);
+  } catch (error) {
+    // Fallback to generic sample data
+    return [
+      { id: 1, name: "Sample Item 1", description: "Generated from description", created_at: new Date().toISOString() },
+      { id: 2, name: "Sample Item 2", description: "Generated from description", created_at: new Date().toISOString() },
+      { id: 3, name: "Sample Item 3", description: "Generated from description", created_at: new Date().toISOString() }
+    ];
+  }
+}
 
 router.post("/chat", requireAuth, async (req, res) => {
   try {
@@ -208,6 +229,62 @@ router.post("/chat", requireAuth, async (req, res) => {
       } catch (err) {
         console.error("❌ CREATE TABLE error:", err);
         return res.status(500).json({ success: false, message: `Failed to create table: ${err.message}` });
+      }
+    }
+
+    // Handle database building from data
+    if (intent.intent === "build_database") {
+      try {
+        console.log('🏗️ Processing database building request');
+        
+        // Extract data from message (look for data patterns)
+        const dataMatch = message.match(/(?:data|json|csv|build|create).*?:\s*([\s\S]+)/i);
+        const data = dataMatch ? dataMatch[1].trim() : message;
+        
+        // Try to detect if user provided actual data or just description
+        const hasStructuredData = data.includes('{') || data.includes('[') || data.includes(',') || data.includes('\n');
+        
+        if (!hasStructuredData) {
+          // User just described what they want, generate sample data
+          const sampleData = await generateSampleDataFromDescription(data);
+          const result = await buildDatabaseFromData(sampleData, data, uid, 'json', 'sqlite');
+          
+          if (result.success) {
+            return res.json({
+              success: true,
+              explanation: `🎉 I've created a database called "${result.schema.databaseName}" based on your description! The database includes ${result.schema.tables.length} tables with sample data.`,
+              schema: result.schema,
+              sqlDDL: result.sqlDDL,
+              database: result.database,
+              dbId: result.database.dbPath ? result.database.filename : result.database.dbName,
+              schemaCreated: true,
+              intent: intent
+            });
+          } else {
+            return res.status(500).json({ success: false, message: result.error });
+          }
+        } else {
+          // User provided actual data
+          const result = await buildDatabaseFromData(data, message, uid, 'auto', 'sqlite');
+          
+          if (result.success) {
+            return res.json({
+              success: true,
+              explanation: `🎉 I've analyzed your data and created a database called "${result.schema.databaseName}"! The database includes ${result.schema.tables.length} tables with your data properly structured.`,
+              schema: result.schema,
+              sqlDDL: result.sqlDDL,
+              database: result.database,
+              dbId: result.database.dbPath ? result.database.filename : result.database.dbName,
+              schemaCreated: true,
+              intent: intent
+            });
+          } else {
+            return res.status(500).json({ success: false, message: result.error });
+          }
+        }
+      } catch (err) {
+        console.error('❌ Database building error:', err);
+        return res.status(500).json({ success: false, message: `Failed to build database: ${err.message}` });
       }
     }
 
