@@ -467,23 +467,118 @@ async function executeQueryOnUserDb(dbId, userId, query) {
     }
   }
   
-  // Replace table names with schema.table format
-  const [tableRows] = await pool.execute(
-    `SELECT table_name, mysql_table_name FROM database_tables WHERE db_id = ?`,
-    [dbId]
-  );
-  
-  for (const tableRow of tableRows) {
-    const regex = new RegExp(`\\b${tableRow.table_name}\\b`, 'gi');
-    modifiedQuery = modifiedQuery.replace(regex, `\`${schemaName}\`.\`${tableRow.mysql_table_name}\``);
+  // Handle "show all rows" requests by creating separate queries for each table
+  const originalQueryLower = query.toLowerCase();
+  const isShowAllRowsRequest = (originalQueryLower.includes('show') && originalQueryLower.includes('all') && 
+      (originalQueryLower.includes('row') || originalQueryLower.includes('data'))) ||
+      (modifiedQuery.toLowerCase().includes('show') && modifiedQuery.toLowerCase().includes('all') && 
+      (modifiedQuery.toLowerCase().includes('row') || modifiedQuery.toLowerCase().includes('data')));
+      
+  if (isShowAllRowsRequest) {
+    console.log(`🔍 Detected "show all rows" request, creating separate queries`);
+    
+    // Get all tables for this database
+    const [tableRows] = await pool.execute(
+      `SELECT table_name, mysql_table_name FROM database_tables WHERE db_id = ?`,
+      [dbId]
+    );
+    
+    console.log(`🔍 Found ${tableRows.length} tables for dbId ${dbId}:`, tableRows);
+    
+    if (tableRows.length > 0) {
+      // Create separate queries for each table instead of UNION ALL
+      // This avoids column compatibility issues between different tables
+      console.log(`🔍 Creating separate queries for each table instead of UNION ALL`);
+      
+      const separateQueries = tableRows.map(tableRow => {
+        console.log(`🔍 Adding table: ${tableRow.table_name} -> ${tableRow.mysql_table_name}`);
+        return `SELECT '${tableRow.table_name}' as table_name, * FROM \`${schemaName}\`.\`${tableRow.mysql_table_name}\``;
+      });
+      
+      // Join with semicolons to create multiple separate queries
+      modifiedQuery = separateQueries.join('; ');
+      console.log(`🔍 Created separate queries: ${modifiedQuery.substring(0, 200)}...`);
+    } else {
+      console.log(`⚠️ No tables found for database ${dbId}, trying to get tables directly from MySQL schema`);
+      
+      // Fallback: Get tables directly from MySQL schema
+      try {
+        const [actualTables] = await pool.execute(
+          `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ?`,
+          [schemaName]
+        );
+        
+        if (actualTables.length > 0) {
+          console.log(`🔍 Found ${actualTables.length} tables directly from MySQL schema:`, actualTables);
+          
+          const separateQueries = actualTables.map(table => {
+            console.log(`🔍 Adding table: ${table.TABLE_NAME}`);
+            return `SELECT '${table.TABLE_NAME}' as table_name, * FROM \`${schemaName}\`.\`${table.TABLE_NAME}\``;
+          });
+          
+          modifiedQuery = separateQueries.join('; ');
+          console.log(`🔍 Created fallback separate queries: ${modifiedQuery.substring(0, 200)}...`);
+        } else {
+          console.log(`⚠️ No tables found in MySQL schema ${schemaName}`);
+        }
+      } catch (err) {
+        console.error(`❌ Error getting tables from MySQL schema:`, err.message);
+      }
+    }
+  } else {
+    // Replace table names with schema.table format (only if not already handled by separate queries)
+    const [tableRows] = await pool.execute(
+      `SELECT table_name, mysql_table_name FROM database_tables WHERE db_id = ?`,
+      [dbId]
+    );
+    
+    for (const tableRow of tableRows) {
+      // More specific regex to only match table names in FROM clauses, not in string literals
+      const regex = new RegExp(`\\bFROM\\s+${tableRow.table_name}\\b`, 'gi');
+      modifiedQuery = modifiedQuery.replace(regex, `FROM \`${schemaName}\`.\`${tableRow.mysql_table_name}\``);
+    }
   }
   
-  // Execute the modified query
+  // Handle multiple SELECT statements
   console.log(`🔍 Executing query: ${modifiedQuery}`);
-  const [results] = await pool.execute(modifiedQuery);
-  console.log(`✅ Query executed successfully, returned ${results.length} rows`);
   
-  return results;
+  // Check if query contains multiple SELECT statements
+  const selectStatements = modifiedQuery.split(';').filter(stmt => stmt.trim().toUpperCase().startsWith('SELECT'));
+  
+  if (selectStatements.length > 1) {
+    console.log(`🔍 Found ${selectStatements.length} SELECT statements, executing separately`);
+    let allResults = [];
+    let allColumns = new Set();
+    
+    for (const statement of selectStatements) {
+      const trimmedStmt = statement.trim();
+      if (trimmedStmt) {
+        try {
+          console.log(`🔍 Executing: ${trimmedStmt.substring(0, 100)}...`);
+          const [results] = await pool.execute(trimmedStmt);
+          console.log(`✅ Statement returned ${results.length} rows`);
+          
+          if (results.length > 0) {
+            allResults = allResults.concat(results);
+            // Collect all column names
+            Object.keys(results[0]).forEach(col => allColumns.add(col));
+          }
+        } catch (err) {
+          console.error(`❌ Error executing statement: ${trimmedStmt}`, err.message);
+          // Continue with other statements
+        }
+      }
+    }
+    
+    console.log(`✅ Multiple queries executed successfully, returned ${allResults.length} total rows`);
+    console.log(`📊 Columns found: ${Array.from(allColumns).join(', ')}`);
+    return allResults;
+  } else {
+    // Single query execution
+    const [results] = await pool.execute(modifiedQuery);
+    console.log(`✅ Query executed successfully, returned ${results.length} rows`);
+    return results;
+  }
 }
 
 // Get list of user's databases

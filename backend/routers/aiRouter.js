@@ -46,10 +46,14 @@ router.post("/chat", requireAuth, async (req, res) => {
     if (!uid) return res.status(401).json({ success: false, message: "Unauthorized" });
 
     console.log(`🔄 Processing AI chat request for user: ${uid}, dbId: ${dbId}, message: ${message}`);
+    console.log(`🔄 UPDATED CODE VERSION - Random DB handler should work now`);
 
     // Use AI to intelligently detect intent
     const intent = await detectIntent(message, !!dbId);
     console.log(`🎯 Detected intent:`, intent);
+    console.log(`🎯 Message: "${message}", dbId: ${dbId}`);
+    console.log(`🎯 Intent type: ${intent.intent}, Confidence: ${intent.confidence}`);
+    console.log(`🎯 About to check intents - create_random_database check: ${intent.intent === "create_random_database"}`);
 
     // Handle general chat
     if (intent.intent === "general_chat") {
@@ -68,6 +72,47 @@ router.post("/chat", requireAuth, async (req, res) => {
       }
     }
 
+    // Handle random database creation
+    console.log(`🎯 Checking for create_random_database - intent: ${intent.intent}, comparison: ${intent.intent === "create_random_database"}`);
+    if (intent.intent === "create_random_database") {
+      console.log('🎲 Creating random database with demo data...');
+      console.log('🎲 Intent details:', intent);
+      console.log('🎲 This should be reached for create_random_database');
+      
+      try {
+        // Call the demo database creation endpoint
+        const { createDemoDB } = require("../controllers/uploadController");
+        const demoReq = { user: { id: uid } };
+        const demoRes = {
+          json: (data) => {
+            console.log('✅ Random database created:', data);
+            return res.json({
+              success: true,
+              explanation: `Random database created successfully! Generated ${data.totalTables} tables with ${data.totalRows} total rows of realistic sample data.`,
+              sql: "CREATE DATABASE with sample tables and data",
+              schemaCreated: true,
+              dbId: data.dbId,
+              isDualResponse: false,
+              isGeneralQuestion: false
+            });
+          },
+          status: (code) => ({
+            json: (data) => res.status(code).json(data)
+          })
+        };
+        
+        await createDemoDB(demoReq, demoRes);
+        return;
+      } catch (error) {
+        console.error('❌ Random database creation failed:', error);
+        return res.status(500).json({
+          success: false,
+          message: `Failed to create random database: ${error.message}`,
+          intent: intent
+        });
+      }
+    }
+
     // Handle database queries
     if (intent.intent === "database_query") {
       if (!dbId) {
@@ -79,47 +124,63 @@ router.post("/chat", requireAuth, async (req, res) => {
       }
     }
 
-    // Get database schema information for database queries
-    let schemaText = "";
-    if (dbId && intent.intent === "database_query") {
-      const schemaInfo = await getDatabaseSchema(dbId, uid);
-      if (!schemaInfo) {
-        return res.status(404).json({ success: false, message: "Database not found for this user" });
+    // Skip SQL generation for random database creation
+    if (intent.intent === "create_random_database") {
+      console.log('🎲 Skipping SQL generation for random database creation');
+      // The random database creation handler above will handle this
+    } else {
+      // Get database schema information for database queries
+      let schemaText = "";
+      if (dbId && intent.intent === "database_query") {
+        const schemaInfo = await getDatabaseSchema(dbId, uid);
+        if (!schemaInfo) {
+          return res.status(404).json({ success: false, message: "Database not found for this user" });
+        }
+
+        // Create detailed schema description for AI
+        schemaText = schemaInfo.tables.map(table => {
+          const columns = table.columns ? table.columns.map(col => `${col.name} (${col.type})`).join(', ') : 'columns not available';
+          return `Table: ${table.name} - ${table.rowCount} rows\n  Columns: ${columns}`;
+        }).join('\n\n');
+
+        console.log(`📊 Database schema:`, schemaText);
+      } else if (intent.intent === "create_schema" || intent.intent === "create_table") {
+        console.log(`📊 Creating new schema/table`);
+        schemaText = `No existing schema - this is a new database creation request. 
+        
+User request: "${message}"
+
+Based on the user's description, create appropriate table structures. If the user describes a specific domain (like "bookstore", "restaurant", "e-commerce"), generate realistic tables with proper fields, relationships, and data types for that domain.`;
       }
 
-      // Create detailed schema description for AI
-      schemaText = schemaInfo.tables.map(table => {
-        const columns = table.columns ? table.columns.map(col => `${col.name} (${col.type})`).join(', ') : 'columns not available';
-        return `Table: ${table.name} - ${table.rowCount} rows\n  Columns: ${columns}`;
-      }).join('\n\n');
-
-      console.log(`📊 Database schema:`, schemaText);
-    } else if (intent.intent === "create_schema" || intent.intent === "create_table") {
-      console.log(`📊 Creating new schema/table`);
-      schemaText = "No existing schema - this is a new database creation request.";
+      // Generate SQL query based on intent
+      const sql = (await generateSQL(message, schemaText, uid)).trim();
+      console.log(`🔍 Generated SQL:`, sql);
     }
 
-    // Generate SQL query based on intent
-    const sql = (await generateSQL(message, schemaText, uid)).trim();
-    console.log(`🔍 Generated SQL:`, sql);
-
-    // Check if it's a dangerous operation
-    const lowerSql = sql.toLowerCase().trim();
-    if (lowerSql.includes('truncate') || (lowerSql.includes('delete from') && !lowerSql.includes('where'))) {
-      return res.status(400).json({
-        success: false,
-        message: "Dangerous operations are not allowed. Use WHERE clauses for DELETE operations.",
-        sql,
-        intent: intent
-      });
+    // Check if it's a dangerous operation (only if SQL was generated)
+    if (intent.intent !== "create_random_database") {
+      const lowerSql = sql.toLowerCase().trim();
+      if (lowerSql.includes('truncate') || (lowerSql.includes('delete from') && !lowerSql.includes('where'))) {
+        return res.status(400).json({
+          success: false,
+          message: "Dangerous operations are not allowed. Use WHERE clauses for DELETE operations.",
+          sql,
+          intent: intent
+        });
+      }
     }
 
     // Handle CREATE operations (both create_schema and create_table)
-    if (intent.intent === "create_schema" || intent.intent === "create_table" || lowerSql.startsWith('create table')) {
+    if (intent.intent !== "create_random_database") {
+      const lowerSql = sql.toLowerCase().trim();
+      console.log('🔍 Checking CREATE operations - Intent:', intent.intent, 'SQL starts with create table:', lowerSql.startsWith('create table'));
+      if (intent.intent === "create_schema" || intent.intent === "create_table" || lowerSql.startsWith('create table')) {
       // Handle CREATE operations
       try {
         console.log('🔧 Processing CREATE operation:', intent.intent);
         console.log('🔍 Generated SQL:', sql);
+        console.log('🔍 Message:', message);
         
         // Extract schema name from user request
         const requestedSchemaName = await extractSchemaName(message);
@@ -129,14 +190,50 @@ router.post("/chat", requireAuth, async (req, res) => {
         let createTableSQL = sql;
         if (!lowerSql.startsWith('create table')) {
           console.log('🔧 AI did not generate CREATE TABLE, generating fallback...');
-          // Use the extracted schema name as the table name, or fallback to a generic name
-          const tableName = requestedSchemaName || 'sample_data';
-          createTableSQL = `CREATE TABLE ${tableName} (
+          
+          // Try to generate a more intelligent fallback based on the user's description
+          const tableName = requestedSchemaName || 'main_data';
+          let fallbackSQL = `CREATE TABLE ${tableName} (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
             description TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
           )`;
+          
+          // If user mentioned specific domains, create more appropriate tables
+          const msg = message.toLowerCase();
+          if (msg.includes('book') || msg.includes('library')) {
+            fallbackSQL = `CREATE TABLE books (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              title TEXT NOT NULL,
+              author TEXT NOT NULL,
+              isbn TEXT,
+              price DECIMAL(10,2),
+              published_date TEXT,
+              created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )`;
+          } else if (msg.includes('restaurant') || msg.includes('food') || msg.includes('menu')) {
+            fallbackSQL = `CREATE TABLE menu_items (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL,
+              description TEXT,
+              price DECIMAL(10,2),
+              category TEXT,
+              available BOOLEAN DEFAULT 1,
+              created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )`;
+          } else if (msg.includes('customer') || msg.includes('client')) {
+            fallbackSQL = `CREATE TABLE customers (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL,
+              email TEXT UNIQUE,
+              phone TEXT,
+              address TEXT,
+              created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )`;
+          }
+          
+          createTableSQL = fallbackSQL;
         }
         
         // Create a temporary SQLite database with the generated schema
@@ -233,10 +330,11 @@ router.post("/chat", requireAuth, async (req, res) => {
         console.error("❌ CREATE TABLE error:", err);
         return res.status(500).json({ success: false, message: `Failed to create table: ${err.message}` });
       }
+      }
     }
 
     // Handle DROP TABLE operations
-    if (lowerSql.includes('drop table')) {
+    if (intent.intent !== "create_random_database" && lowerSql.includes('drop table')) {
       if (!dbId) {
         return res.status(400).json({ 
           success: false, 

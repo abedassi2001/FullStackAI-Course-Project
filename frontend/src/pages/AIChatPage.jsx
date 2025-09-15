@@ -201,6 +201,41 @@ export default function AIChatPage() {
     textareaRef.current?.focus();
   };
 
+  // Handle export functionality
+  const handleExport = async (format) => {
+    if (!selectedDbId) {
+      setError("No database selected for export");
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`http://localhost:5000/uploads/export/${selectedDbId}/${format}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
+      });
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Get filename from response headers or create default
+      const filename = response.headers['content-disposition']?.split('filename=')[1]?.replace(/"/g, '') || 
+                     `database_export.${format}`;
+      
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error('Export failed:', error);
+      setError(`Export failed: ${error.response?.data?.message || error.message}`);
+    }
+  };
+
   return (
     <div className="chat-container">
       {/* Header */}
@@ -228,6 +263,26 @@ export default function AIChatPage() {
             </option>
           ))}
         </select>
+        
+        {/* Export Buttons */}
+        {selectedDbId && (
+          <div className="export-buttons">
+            <button 
+              className="export-btn csv-btn"
+              onClick={() => handleExport('csv')}
+              title="Export to CSV"
+            >
+              📊 CSV
+            </button>
+            <button 
+              className="export-btn json-btn"
+              onClick={() => handleExport('json')}
+              title="Export to JSON"
+            >
+              📄 JSON
+            </button>
+          </div>
+        )}
       </div>
 
 
@@ -301,7 +356,9 @@ export default function AIChatPage() {
                   {/* ChatGPT Explanation Block (for dual responses) */}
                   {msg.isDualResponse && msg.chatExplanation && (
                     <div className="chat-explanation-block">
-                      <div className="chat-explanation-header">🤖 AI Explanation:</div>
+                      <div className="chat-explanation-header">
+                        🤖 AI Explanation:
+                      </div>
                       <div className="chat-explanation-text">{msg.chatExplanation}</div>
                     </div>
                   )}

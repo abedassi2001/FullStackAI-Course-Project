@@ -5,8 +5,8 @@ import './DatabaseManager.css';
 const DatabaseManager = () => {
   const [databases, setDatabases] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const [dragActive, setDragActive] = useState(false);
+  const [status, setStatus] = useState({ type: "", msg: "" });
   const fileInputRef = useRef(null);
 
   // Fetch databases
@@ -30,35 +30,40 @@ const DatabaseManager = () => {
   const handleFileUpload = async (file) => {
     if (!file) return;
 
-    setIsUploading(true);
-    setUploadProgress(0);
+    // optional validation
+    const allowed = [".sql", ".sqlite", ".db", ".csv", ".json"];
+    const ok = allowed.some((ext) => file.name.toLowerCase().endsWith(ext));
+    if (!ok) {
+      setStatus({ type: "error", msg: "Unsupported file type." });
+      return;
+    }
 
-    const formData = new FormData();
-    formData.append('database', file);
+    setIsUploading(true);
+    setStatus({ type: "info", msg: "Uploading…" });
 
     try {
+      const formData = new FormData();
+      formData.append("dbfile", file);
+      
       const token = localStorage.getItem("token");
-      const res = await axios.post("http://localhost:5000/upload-database", formData, {
+      await axios.post("http://localhost:5000/uploads", formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${token}`
-        },
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          setUploadProgress(percentCompleted);
+          "Content-Type": "multipart/form-data",
+          "Authorization": `Bearer ${token}`
         }
       });
-
-      if (res.data.success) {
-        await fetchDatabases();
-        alert('Database uploaded successfully!');
-      }
-    } catch (err) {
-      console.error("Upload failed:", err);
-      alert(`Upload failed: ${err.response?.data?.error || err.message}`);
+      
+      setStatus({ type: "success", msg: "Database uploaded successfully." });
+      fetchDatabases(); // Refresh the database list
+    } catch (e) {
+      setStatus({
+        type: "error",
+        msg: e?.response?.data?.message || e?.message || "Upload failed.",
+      });
     } finally {
       setIsUploading(false);
-      setUploadProgress(0);
+      // allow re-selecting the same file name again
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -105,41 +110,37 @@ const DatabaseManager = () => {
 
     try {
       const token = localStorage.getItem("token");
-      await axios.delete(`http://localhost:5000/databases/${dbId}`, {
+      await axios.delete(`http://localhost:5000/uploads/${dbId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      setStatus({ type: "success", msg: "Database deleted successfully!" });
       await fetchDatabases();
-      alert('Database deleted successfully!');
     } catch (err) {
       console.error("Delete failed:", err);
-      alert(`Delete failed: ${err.response?.data?.error || err.message}`);
+      setStatus({ 
+        type: "error", 
+        msg: `Delete failed: ${err.response?.data?.error || err.message}` 
+      });
     }
   };
 
-  // Create random database
+  // Create random database)
   const createRandomDatabase = async () => {
+    setStatus({ type: "info", msg: "Loading demo database…" });
     try {
-      setIsUploading(true);
-      setUploadProgress(0);
-
       const token = localStorage.getItem("token");
-      const res = await axios.post("http://localhost:5000/ai/chat", {
-        message: "Create a random database with sample data for testing",
-        dbId: null
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await axios.post(
+        "http://localhost:5000/uploads/demo",
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setStatus({ type: "success", msg: `Demo DB ready: ${res.data.filename}` });
+      fetchDatabases(); // Refresh the database list
+    } catch (e) {
+      setStatus({
+        type: "error",
+        msg: e?.response?.data?.message || e?.message || "Could not load demo DB.",
       });
-
-      if (res.data.success) {
-        await fetchDatabases();
-        alert('Random database created successfully!');
-      }
-    } catch (err) {
-      console.error("Create random DB failed:", err);
-      alert(`Failed to create random database: ${err.response?.data?.message || err.message}`);
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(0);
     }
   };
 
@@ -189,12 +190,12 @@ const DatabaseManager = () => {
                     stroke="#7c5cff"
                     strokeWidth="4"
                     strokeDasharray={`${2 * Math.PI * 20}`}
-                    strokeDashoffset={`${2 * Math.PI * 20 * (1 - uploadProgress / 100)}`}
+                    strokeDashoffset={`${2 * Math.PI * 20 * 0.3}`}
                     strokeLinecap="round"
                     transform="rotate(-90 24 24)"
                   />
                 </svg>
-                <span className="progress-text">{uploadProgress}%</span>
+                <span className="progress-text">Uploading...</span>
               </div>
               <p>Uploading database...</p>
             </div>
@@ -284,6 +285,13 @@ const DatabaseManager = () => {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+        
+        {/* Status Message */}
+        {status.msg && (
+          <div className={`status-message ${status.type}`}>
+            {status.msg}
           </div>
         )}
       </div>
