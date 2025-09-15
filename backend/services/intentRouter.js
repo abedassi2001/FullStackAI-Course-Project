@@ -7,11 +7,11 @@ function detectIntentFast(message) {
   const msg = message.toLowerCase();
   
   // Database query keywords
-  const queryKeywords = ['show', 'get', 'find', 'select', 'insert', 'update', 'delete', 'add', 'change', 'remove'];
+  const queryKeywords = ['show', 'get', 'find', 'select', 'insert', 'update', 'delete', 'add', 'change', 'remove', 'all table', 'table names', 'list tables'];
   const hasQueryKeywords = queryKeywords.some(keyword => msg.includes(keyword));
   
   // Create keywords
-  const createKeywords = ['create', 'make', 'build', 'new table', 'new database', 'new schema'];
+  const createKeywords = ['create', 'make', 'build', 'new table', 'new database', 'new schema', 'random db', 'random database', 'random schema', 'random scheme', 'table called', 'table named'];
   const hasCreateKeywords = createKeywords.some(keyword => msg.includes(keyword));
   
   // General chat indicators
@@ -19,9 +19,40 @@ function detectIntentFast(message) {
   const hasChatKeywords = chatKeywords.some(keyword => msg.includes(keyword));
   
   if (hasCreateKeywords) {
+    // Check for random database/schema creation
+    if (msg.includes('random') && (msg.includes('db') || msg.includes('database') || msg.includes('schema') || msg.includes('scheme'))) {
+      return {
+        intent: 'create_random_database',
+        confidence: 0.95,
+        reasoning: 'Contains random database creation keywords',
+        requiresDatabase: false
+      };
+    }
+    
+    // Check for table creation specifically
+    if (msg.includes('table') || msg.includes('table called') || msg.includes('table named')) {
+      return {
+        intent: 'create_table',
+        confidence: 0.95,
+        reasoning: 'Contains table creation keywords',
+        requiresDatabase: false
+      };
+    }
+    
+    // Check for specific database/schema creation with details
+    if (msg.includes('database') || msg.includes('schema') || msg.includes('db')) {
+      return {
+        intent: 'create_schema',
+        confidence: 0.9,
+        reasoning: 'Contains database/schema creation keywords',
+        requiresDatabase: false
+      };
+    }
+    
+    // Default to table creation
     return {
-      intent: msg.includes('schema') || msg.includes('database') ? 'create_schema' : 'create_table',
-      confidence: 0.9,
+      intent: 'create_table',
+      confidence: 0.8,
       reasoning: 'Contains create keywords',
       requiresDatabase: false
     };
@@ -65,7 +96,14 @@ async function detectIntentAI(message, hasDatabase = false) {
     messages: [
       {
         role: "system",
-        content: `Classify intent. Return JSON: {"intent": "general_chat|database_query|create_schema|create_table", "confidence": 0.0-1.0, "requiresDatabase": true/false}`
+        content: `Classify intent. Return JSON: {"intent": "general_chat|database_query|create_schema|create_table|create_random_database", "confidence": 0.0-1.0, "requiresDatabase": true/false}
+
+RULES:
+- "create random db/database/schema" → create_random_database
+- "create database/schema for [description]" → create_schema  
+- "create [table]" → create_table
+- "show/get/find [data]" → database_query
+- General conversation → general_chat`
       },
       { role: "user", content: message },
     ],
@@ -85,13 +123,23 @@ async function detectIntent(message, hasDatabase = false) {
   // Try fast detection first
   const fastResult = detectIntentFast(message);
   
+  // Always use fast result for create_random_database to avoid AI override
+  if (fastResult.intent === 'create_random_database') {
+    return fastResult;
+  }
+  
   // If confidence is high enough, return fast result
   if (fastResult.confidence > 0.8) {
     return fastResult;
   }
   
   // Otherwise, use AI for complex cases
-  return await detectIntentAI(message, hasDatabase);
+  try {
+    return await detectIntentAI(message, hasDatabase);
+  } catch (error) {
+    console.error('AI intent detection failed, using fast result:', error.message);
+    return fastResult;
+  }
 }
 
 module.exports = {

@@ -3,6 +3,7 @@ const express = require("express");
 const upload = require("../middlewares/upload"); // multer config
 const { requireAuth } = require("../middlewares/authMiddleware");
 const ctrl = require("../controllers/uploadController");
+const exportCtrl = require("../controllers/exportController");
 
 const router = express.Router();
 
@@ -19,5 +20,11 @@ router.get("/:id/schema", requireAuth, ctrl.schemaPreview);
 
 // Create and upload a demo SQLite database for the user
 router.post("/demo", requireAuth, ctrl.createDemoDB);
+
+// Export database to CSV or JSON
+router.get("/export/:dbId/:format", requireAuth, exportCtrl.exportDatabase);
+
+// Delete database
+router.delete("/:dbId", requireAuth, ctrl.deleteDatabase);
 
 module.exports = router;
