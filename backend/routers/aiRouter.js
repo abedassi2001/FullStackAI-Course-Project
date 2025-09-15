@@ -9,6 +9,9 @@ const { getRealtimeSuggestions } = require("../services/querySuggestionsService"
 const {
   getDatabaseSchema,
   executeQueryOnUserDb,
+  updateDatabaseTablesAfterDrop,
+  syncDatabaseTables,
+  cleanupOrphanedDatabases,
 } = require("../services/sqliteToMysqlService");
 const { buildDatabaseFromData } = require("../services/databaseBuilderService");
 
@@ -102,7 +105,7 @@ router.post("/chat", requireAuth, async (req, res) => {
 
     // Check if it's a dangerous operation
     const lowerSql = sql.toLowerCase().trim();
-    if (lowerSql.includes('drop table') || lowerSql.includes('truncate') || lowerSql.includes('delete from') && !lowerSql.includes('where')) {
+    if (lowerSql.includes('truncate') || (lowerSql.includes('delete from') && !lowerSql.includes('where'))) {
       return res.status(400).json({
         success: false,
         message: "Dangerous operations are not allowed. Use WHERE clauses for DELETE operations.",
@@ -229,6 +232,72 @@ router.post("/chat", requireAuth, async (req, res) => {
       } catch (err) {
         console.error("❌ CREATE TABLE error:", err);
         return res.status(500).json({ success: false, message: `Failed to create table: ${err.message}` });
+      }
+    }
+
+    // Handle DROP TABLE operations
+    if (lowerSql.includes('drop table')) {
+      if (!dbId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Please select a database to drop tables from.",
+          intent: intent
+        });
+      }
+
+      try {
+        console.log('🗑️ Processing DROP TABLE operation');
+        
+        // Extract table name from DROP TABLE statement
+        const dropMatch = lowerSql.match(/drop\s+table\s+(?:if\s+exists\s+)?[`"]?(\w+)[`"]?/i);
+        if (!dropMatch) {
+          return res.status(400).json({ 
+            success: false, 
+            message: "Could not identify table name in DROP TABLE statement.",
+            sql,
+            intent: intent
+          });
+        }
+        
+        const tableName = dropMatch[1];
+        console.log(`🗑️ Dropping table: ${tableName}`);
+        
+        // Execute the DROP TABLE query
+        const rows = await executeQueryOnUserDb(dbId, uid, sql);
+        
+        // Update database_tables to remove the dropped table
+        await updateDatabaseTablesAfterDrop(dbId, uid, tableName);
+        
+        // Sync all tables to ensure consistency
+        await syncDatabaseTables(dbId, uid);
+        
+        // Generate explanation
+        const explanation = `✅ Table "${tableName}" has been successfully dropped from the database.`;
+        const chatExplanation = await chat(`I just dropped the table "${tableName}" from the database. Explain what this means and what the user should know about this operation.`, []);
+        
+        console.log(`✅ Table ${tableName} dropped successfully`);
+
+        // Save prompt history
+        try { await queryService.createQuery(Number(uid) || 1, message); } catch (_) {}
+
+        return res.json({ 
+          success: true, 
+          sql, 
+          explanation: explanation,
+          chatExplanation: chatExplanation,
+          isDualResponse: true,
+          tableDropped: true,
+          droppedTableName: tableName,
+          intent: intent
+        });
+      } catch (err) {
+        console.error("❌ DROP TABLE error:", err);
+        return res.status(500).json({ 
+          success: false, 
+          message: `Failed to drop table: ${err.message}`,
+          sql,
+          intent: intent
+        });
       }
     }
 

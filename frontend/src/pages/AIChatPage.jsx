@@ -33,6 +33,7 @@ export default function AIChatPage() {
         headers: { Authorization: `Bearer ${token}` }
       });
       setDatabases(res.data.databases || []);
+      console.log(`📊 Fetched ${res.data.databases?.length || 0} valid databases`);
     } catch (err) {
       console.error("Failed to fetch databases:", err);
     }
@@ -41,6 +42,11 @@ export default function AIChatPage() {
   // Fetch user's saved databases on component mount
   useEffect(() => {
     fetchDatabases();
+    
+    // Set up periodic refresh every 30 seconds to ensure database list is up-to-date
+    const interval = setInterval(fetchDatabases, 30000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   // Fetch smart suggestions based on current input
@@ -154,13 +160,15 @@ export default function AIChatPage() {
         dbId: res.data?.dbId,
         isDualResponse: res.data?.isDualResponse || false,
         chatExplanation: res.data?.chatExplanation,
-        isGeneralQuestion: res.data?.isGeneralQuestion || false
+        isGeneralQuestion: res.data?.isGeneralQuestion || false,
+        tableDropped: res.data?.tableDropped || false,
+        droppedTableName: res.data?.droppedTableName
       };
       
       setHistory((h) => [...h, assistantMessage]);
       
-      // Refresh databases list if a schema was created
-      if (res.data?.schemaCreated) {
+      // Refresh databases list if a schema was created or table was dropped
+      if (res.data?.schemaCreated || res.data?.tableDropped) {
         fetchDatabases();
       }
     } catch (err) {
@@ -329,6 +337,18 @@ export default function AIChatPage() {
                     <div className="sql-ddl-block">
                       <div className="sql-ddl-header">💾 Generated SQL:</div>
                       <pre className="sql-ddl-code">{msg.sqlDDL}</pre>
+                    </div>
+                  )}
+                  
+                  {/* Table Dropped Block */}
+                  {msg.tableDropped && (
+                    <div className="table-dropped-block">
+                      <div className="table-dropped-header">🗑️ Table Dropped:</div>
+                      <div className="table-dropped-info">
+                        <p><strong>Table:</strong> {msg.droppedTableName}</p>
+                        <p><strong>Status:</strong> Successfully removed from database</p>
+                        <p><em>Note: The database list has been updated to reflect this change.</em></p>
+                      </div>
                     </div>
                   )}
                   
