@@ -18,6 +18,7 @@ CORE CAPABILITIES:
 - UPDATE queries: Modify existing records  
 - DELETE queries: Remove records
 - CREATE TABLE queries: Create new tables
+- DROP TABLE queries: Remove tables
 - Metadata queries: Show database structure
 
 QUERY EXAMPLES BY CATEGORY:
@@ -47,6 +48,12 @@ QUERY EXAMPLES BY CATEGORY:
 - "Delete all products with price less than 50" → DELETE FROM products WHERE price < 50;
 - "Remove employees from the old department" → DELETE FROM employees WHERE department = 'old department';
 
+🗑️ DROP TABLE QUERIES (Remove Tables):
+- "Drop the customers table" → DROP TABLE customers;
+- "Remove the products table" → DROP TABLE products;
+- "Delete the old_orders table" → DROP TABLE old_orders;
+- "Drop table if exists temp_data" → DROP TABLE IF EXISTS temp_data;
+
 🏗️ CREATE TABLE QUERIES (Database Structure):
 - "Create a users table with name, email, and created_at" → CREATE TABLE users (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), email VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 - "Create a products table with name, price, and category" → CREATE TABLE products (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), price DECIMAL(10,2), category VARCHAR(100));
@@ -75,7 +82,8 @@ COMMON PATTERNS TO RECOGNIZE:
 - "Add a new [record]" / "Insert [record]" / "Create a new [record]" → INSERT (when table exists)
 - "Add [table] with [fields]" / "Create [table] with [fields]" → INSERT (when table exists)
 - "Change" / "Update" / "Modify" → UPDATE
-- "Remove" / "Delete" → DELETE
+- "Remove [record]" / "Delete [record]" → DELETE
+- "Drop [table]" / "Remove [table]" / "Delete [table]" → DROP TABLE
 - "Create table" / "Make a table" / "Create a [table] table" → CREATE TABLE
 - "Create schema" / "Create database" / "Create db" → CREATE TABLE (for schema creation)
 - "List tables" / "Show tables" → SHOW TABLES

@@ -33,6 +33,7 @@ export default function AIChatPage() {
         headers: { Authorization: `Bearer ${token}` }
       });
       setDatabases(res.data.databases || []);
+      console.log(`📊 Fetched ${res.data.databases?.length || 0} valid databases`);
     } catch (err) {
       console.error("Failed to fetch databases:", err);
     }
@@ -41,6 +42,11 @@ export default function AIChatPage() {
   // Fetch user's saved databases on component mount
   useEffect(() => {
     fetchDatabases();
+    
+    // Set up periodic refresh every 30 seconds to ensure database list is up-to-date
+    const interval = setInterval(fetchDatabases, 30000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   // Fetch smart suggestions based on current input
@@ -154,13 +160,15 @@ export default function AIChatPage() {
         dbId: res.data?.dbId,
         isDualResponse: res.data?.isDualResponse || false,
         chatExplanation: res.data?.chatExplanation,
-        isGeneralQuestion: res.data?.isGeneralQuestion || false
+        isGeneralQuestion: res.data?.isGeneralQuestion || false,
+        tableDropped: res.data?.tableDropped || false,
+        droppedTableName: res.data?.droppedTableName
       };
       
       setHistory((h) => [...h, assistantMessage]);
       
-      // Refresh databases list if a schema was created
-      if (res.data?.schemaCreated) {
+      // Refresh databases list if a schema was created or table was dropped
+      if (res.data?.schemaCreated || res.data?.tableDropped) {
         fetchDatabases();
       }
     } catch (err) {
@@ -295,6 +303,52 @@ export default function AIChatPage() {
                     <div className="chat-explanation-block">
                       <div className="chat-explanation-header">🤖 AI Explanation:</div>
                       <div className="chat-explanation-text">{msg.chatExplanation}</div>
+                    </div>
+                  )}
+                  
+                  {/* Database Schema Block (for database building) */}
+                  {msg.schema && (
+                    <div className="schema-block">
+                      <div className="schema-header">🏗️ Database Schema: {msg.schema.databaseName}</div>
+                      <div className="schema-info">
+                        <p><strong>Tables:</strong> {msg.schema.tables.length}</p>
+                        <p><strong>Total Rows:</strong> {msg.database?.totalRows || 0}</p>
+                      </div>
+                      <div className="schema-tables">
+                        {msg.schema.tables.map((table, idx) => (
+                          <div key={idx} className="table-info">
+                            <h4>📋 {table.name}</h4>
+                            <p className="table-description">{table.description}</p>
+                            <div className="table-columns">
+                              {table.columns.map((col, colIdx) => (
+                                <span key={colIdx} className="column-tag">
+                                  {col.name} ({col.type})
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* SQL DDL Block (for database building) */}
+                  {msg.sqlDDL && (
+                    <div className="sql-ddl-block">
+                      <div className="sql-ddl-header">💾 Generated SQL:</div>
+                      <pre className="sql-ddl-code">{msg.sqlDDL}</pre>
+                    </div>
+                  )}
+                  
+                  {/* Table Dropped Block */}
+                  {msg.tableDropped && (
+                    <div className="table-dropped-block">
+                      <div className="table-dropped-header">🗑️ Table Dropped:</div>
+                      <div className="table-dropped-info">
+                        <p><strong>Table:</strong> {msg.droppedTableName}</p>
+                        <p><strong>Status:</strong> Successfully removed from database</p>
+                        <p><em>Note: The database list has been updated to reflect this change.</em></p>
+                      </div>
                     </div>
                   )}
                   

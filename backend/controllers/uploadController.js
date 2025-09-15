@@ -6,6 +6,7 @@ const {
   getDatabaseSchema,
   listUserDatabases,
   isMySQLAvailable,
+  cleanupOrphanedDatabases,
 } = require("../services/sqliteToMysqlService");
 const sqlite3 = require("sqlite3").verbose();
 
@@ -64,6 +65,9 @@ exports.listDBs = async (req, res) => {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ success: false, error: "Unauthorized" });
 
+    // Clean up orphaned databases first
+    await cleanupOrphanedDatabases(uid);
+    
     const databases = await listUserDatabases(uid);
     res.json({ success: true, databases });
   } catch (err) {

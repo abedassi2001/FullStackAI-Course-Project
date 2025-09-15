@@ -48,7 +48,6 @@ export default function LoginPage() {
       if (data?.token) localStorage.setItem("token", data.token);
       if (data?.user) localStorage.setItem("user", JSON.stringify(data.user));
 
-      alert("Login successful!");
       navigate("/dashboard");
     } catch (err) {
       alert(`Network error: ${err?.message || "Failed to reach server"}`);
