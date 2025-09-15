@@ -13,6 +13,10 @@ const findAll = async () => {
   return await Query.findAll();
 };
 
+const findByUserId = async (userId) => {
+  return await Query.findAll({ where: { userId } });
+};
+
 const update = async (id, updates) => {
   const query = await Query.findByPk(id);
   if (!query) return null;
@@ -26,4 +30,4 @@ const remove = async (id) => {
   return true;
 };
 
-module.exports = { create, findById, findAll, update, remove };
+module.exports = { create, findById, findAll, findByUserId, update, remove };

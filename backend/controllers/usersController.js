@@ -27,6 +27,19 @@ async function login(req, res) {
   }
 }
 
+// Get current user profile
+async function getProfile(req, res) {
+  try {
+    const user = await svc.getUserById(req.user.id);
+    if (!user) {
+      return sendError(res, 404, new Error("User not found"));
+    }
+    return res.status(200).json(user);
+  } catch (e) {
+    return sendError(res, 500, e);
+  }
+}
+
 // List users (admin)
 async function list(req, res) {
   try {
@@ -69,4 +82,4 @@ async function remove(req, res) {
   }
 }
 
-module.exports = { register, login, list, getOne, update, remove };
+module.exports = { register, login, getProfile, list, getOne, update, remove };

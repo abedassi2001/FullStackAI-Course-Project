@@ -13,6 +13,7 @@ router.post("/login", ctrl.login);
 router.get("/", requireAuth, requireRole("admin"), ctrl.list);
 
 // protected: all authenticated users
+router.get("/profile", requireAuth, ctrl.getProfile);
 router.get("/:id", requireAuth, ctrl.getOne);
 router.put("/:id", requireAuth, ctrl.update);
 router.delete("/:id", requireAuth, requireRole("admin"), ctrl.remove);
