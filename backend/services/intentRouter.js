@@ -17,7 +17,7 @@ async function detectIntent(message, hasDatabase = false) {
         
         Analyze the user's message and determine their intent. Return ONLY a JSON object with this structure:
         {
-          "intent": "general_chat" | "database_query" | "create_schema" | "create_table",
+          "intent": "general_chat" | "database_query" | "create_schema" | "create_table" | "build_database",
           "confidence": 0.0-1.0,
           "reasoning": "brief explanation of why you chose this intent",
           "requiresDatabase": true/false
@@ -28,6 +28,7 @@ async function detectIntent(message, hasDatabase = false) {
         - "database_query": Questions about existing data (SELECT, INSERT, UPDATE, DELETE operations on existing tables)
         - "create_schema": Creating a new database with multiple tables
         - "create_table": Creating a single new table
+        - "build_database": Building a complete database from provided data (CSV, JSON, text, or structured data)
         
         Guidelines:
         - If user is asking about data in a database, use "database_query"
@@ -56,6 +57,9 @@ async function detectIntent(message, hasDatabase = false) {
         - "create an album table" → create_table
         - "create a schema called abedtest" → create_table
         - "create random tables" → create_table
+        - "build a database from this data" → build_database
+        - "create a database from CSV" → build_database
+        - "make a database with this JSON" → build_database
         - "thanks" → general_chat
         - "looks good" → general_chat`
       },
