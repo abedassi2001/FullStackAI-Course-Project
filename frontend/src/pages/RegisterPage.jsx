@@ -77,50 +77,43 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="hero">
-      <div className="noise"></div>
-
-      <header className="hero__nav">
-        <Link to="/" className="brand">2SQL</Link>
-      </header>
-
-      <main className="hero__content">
-        <h1 className="title">
-          Create your <span>2SQL</span> account ✨
-        </h1>
-        <p className="subtitle">
-          Fill in the details below to start building and testing your projects.
-        </p>
+    <div className="register-page">
+      <div className="register-container">
+        <h1>Create your 2SQL account</h1>
+        <p>Fill in the details below to start building and testing your projects.</p>
 
         <form className="register-form" onSubmit={handleSubmit}>
-          <label>
-            Full Name
+          <div className="form-group">
+            <label htmlFor="name">Full Name</label>
             <input
               type="text"
+              id="name"
               name="name"
               value={formData.name}
               onChange={handleChange}
               placeholder="John Doe"
               required
             />
-          </label>
+          </div>
 
-          <label>
-            Email
+          <div className="form-group">
+            <label htmlFor="email">Email</label>
             <input
               type="email"
+              id="email"
               name="email"
               value={formData.email}
               onChange={handleChange}
               placeholder="you@example.com"
               required
             />
-          </label>
+          </div>
 
-          <label>
-            Password
+          <div className="form-group">
+            <label htmlFor="password">Password</label>
             <input
               type="password"
+              id="password"
               name="password"
               value={formData.password}
               onChange={handleChange}
@@ -128,43 +121,42 @@ export default function RegisterPage() {
               required
               minLength={3}
             />
-          </label>
+          </div>
 
-          <label>
-            Confirm Password
+          <div className="form-group">
+            <label htmlFor="confirmPassword">Confirm Password</label>
             <input
               type="password"
+              id="confirmPassword"
               name="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
               placeholder="Confirm your password"
               required
             />
-          </label>
+          </div>
 
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              name="terms"
-              checked={formData.terms}
-              onChange={handleChange}
-              required
-            />
-            I agree to the Terms and Conditions
-          </label>
+          <div className="form-group checkbox-group">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                name="terms"
+                checked={formData.terms}
+                onChange={handleChange}
+                required
+              />
+              I agree to the Terms and Conditions
+            </label>
+          </div>
 
           <button type="submit" className="btn btn-primary">Register</button>
         </form>
 
-        <div className="actions">
-          <span className="muted">Already have an account? </span>
-          <Link to="/login" className="btn btn-ghost">Log In</Link>
+        <div className="register-footer">
+          <span>Already have an account? </span>
+          <Link to="/login">Log In</Link>
         </div>
-      </main>
-
-      <footer className="hero__footer">
-        <span>© {new Date().getFullYear()} 2SQL</span>
-      </footer>
+      </div>
     </div>
   );
 }

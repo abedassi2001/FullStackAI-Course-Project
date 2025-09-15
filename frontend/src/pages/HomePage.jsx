@@ -1,107 +1,80 @@
 // src/pages/HomePage.jsx
-import { Link } from "react-router-dom";
-import { useState, useEffect } from "react";
-import "./HomePage.css";
+import React from 'react';
+import { Link } from 'react-router-dom';
+import './HomePage.css';
 
 export default function HomePage() {
-  const [currentFeature, setCurrentFeature] = useState(0);
-  
-  const features = [
-    "Upload SQLite databases",
-    "Convert to MySQL schemas", 
-    "Ask questions with AI",
-    "Generate SQL queries",
-    "Visualize your data"
-  ];
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentFeature((prev) => (prev + 1) % features.length);
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [features.length]);
-
   return (
-    <div className="hero">
-      <div className="noise"></div>
-      <div className="floating-elements">
-        <div className="floating-card card-1">📊</div>
-        <div className="floating-card card-2">🤖</div>
-        <div className="floating-card card-3">⚡</div>
-        <div className="floating-card card-4">🔍</div>
-        <div className="floating-card card-5">💾</div>
+    <div className="homepage">
+      <div className="homepage-container">
+        {/* Header */}
+        <header className="homepage-header">
+          <div className="logo">
+            <h1>2SQL AI</h1>
+            <p>Natural Language to SQL Converter</p>
+          </div>
+        </header>
+
+        {/* Hero Section */}
+        <main className="homepage-main">
+          <div className="hero-content">
+            <h2>Transform Natural Language into SQL Queries</h2>
+            <p className="hero-description">
+              Our AI-powered platform converts your natural language questions into precise SQL queries, 
+              making database interaction as simple as having a conversation.
+            </p>
+            
+            <div className="features-grid">
+              <div className="feature-card">
+                <div className="feature-icon">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                    <path d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <h3>Natural Language Processing</h3>
+                <p>Ask questions in plain English and get accurate SQL queries</p>
+              </div>
+
+              <div className="feature-card">
+                <div className="feature-icon">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                    <path d="M4 7V4C4 3.44772 4.44772 3 5 3H19C19.5523 3 20 3.44772 20 4V7M4 7H20M4 7V20C4 20.5523 4.44772 21 5 21H19C19.5523 21 20 20.5523 20 20V7M8 11H16M8 15H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <h3>Database Management</h3>
+                <p>Upload and manage your databases with ease</p>
+              </div>
+
+              <div className="feature-card">
+                <div className="feature-icon">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <h3>Smart AI Assistant</h3>
+                <p>Powered by advanced AI for intelligent query generation</p>
+              </div>
+            </div>
+
+            <div className="cta-section">
+              <h3>Ready to get started?</h3>
+              <div className="cta-buttons">
+                <Link to="/login" className="btn btn-primary">
+                  Sign In
+                </Link>
+                <Link to="/register" className="btn btn-secondary">
+                  Create Account
+                </Link>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        {/* Footer */}
+        <footer className="homepage-footer">
+          <p>&copy; 2024 2SQL AI. All rights reserved.</p>
+        </footer>
       </div>
-
-      <header className="hero__nav">
-        <Link to="/" className="brand">
-          <span className="brand-icon">2</span>
-          <span className="brand-text">SQL</span>
-        </Link>
-        <div className="nav-links">
-          <Link to="/login" className="nav-link">Login</Link>
-          <Link to="/register" className="nav-link nav-link-primary">Get Started</Link>
-        </div>
-      </header>
-
-      <main className="hero__content">
-        <div className="hero-badge">
-          <span className="badge-icon">🚀</span>
-          <span>AI-Powered Database Assistant</span>
-        </div>
-        
-        <h1 className="title">
-          Transform Your Data with 
-          <span className="gradient-text"> 2SQL</span>
-        </h1>
-        
-        <p className="subtitle">
-          Upload SQLite databases, convert them to MySQL schemas, and chat with AI to query your data naturally.
-        </p>
-
-        <div className="feature-showcase">
-          <div className="feature-text">
-            <span className="feature-label">Now featuring:</span>
-            <span className="feature-highlight">{features[currentFeature]}</span>
-          </div>
-        </div>
-
-        <div className="actions">
-          <Link to="/register" className="btn btn-primary">
-            <span className="btn-icon">✨</span>
-            Start Free Trial
-          </Link>
-          <Link to="/login" className="btn btn-ghost">
-            <span className="btn-icon">👤</span>
-            Sign In
-          </Link>
-        </div>
-
-        <div className="stats">
-          <div className="stat">
-            <div className="stat-number">100%</div>
-            <div className="stat-label">AI Powered</div>
-          </div>
-          <div className="stat">
-            <div className="stat-number">∞</div>
-            <div className="stat-label">Queries</div>
-          </div>
-          <div className="stat">
-            <div className="stat-number">⚡</div>
-            <div className="stat-label">Real-time</div>
-          </div>
-        </div>
-      </main>
-
-      <footer className="hero__footer">
-        <div className="footer-content">
-          <span>© {new Date().getFullYear()} 2SQL - AI Database Assistant</span>
-          <div className="footer-links">
-            <button className="footer-link">Privacy</button>
-            <button className="footer-link">Terms</button>
-            <button className="footer-link">Support</button>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
