@@ -491,25 +491,211 @@ async function listUserDatabases(userId) {
   await ensureSchema();
   
   const [rows] = await pool.execute(
-    `SELECT d.id, d.filename, d.mysql_schema_name, d.created_at,
-            COUNT(t.id) as table_count,
-            SUM(t.row_count) as total_rows
+    `SELECT d.id, d.filename, d.mysql_schema_name, d.created_at
      FROM user_databases d
-     LEFT JOIN database_tables t ON d.id = t.db_id
      WHERE d.user_id = ?
-     GROUP BY d.id
      ORDER BY d.created_at DESC`,
     [String(userId)]
   );
   
-  return rows.map(row => ({
-    id: row.id,
-    filename: row.filename,
-    mysqlSchemaName: row.mysql_schema_name,
-    tableCount: row.table_count,
-    totalRows: row.total_rows || 0,
-    created_at: row.created_at
-  }));
+  const validDatabases = [];
+  
+  for (const row of rows) {
+    const schemaName = row.mysql_schema_name;
+    
+    try {
+      // Check if the schema exists in MySQL
+      const [schemaExists] = await pool.execute(
+        `SELECT COUNT(*) as count FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?`,
+        [schemaName]
+      );
+      
+      if (schemaExists[0].count === 0) {
+        console.log(`🗑️ Schema ${schemaName} no longer exists in MySQL, skipping database ${row.id}`);
+        continue;
+      }
+      
+      // Get actual tables that exist in MySQL for this schema
+      const [actualTables] = await pool.execute(
+        `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ?`,
+        [schemaName]
+      );
+      
+      if (actualTables.length === 0) {
+        console.log(`🗑️ Schema ${schemaName} exists but has no tables, skipping database ${row.id}`);
+        continue;
+      }
+      
+      // Get row counts for existing tables
+      let totalRows = 0;
+      for (const table of actualTables) {
+        try {
+          const [countResult] = await pool.execute(
+            `SELECT COUNT(*) as count FROM \`${schemaName}\`.\`${table.TABLE_NAME}\``
+          );
+          totalRows += countResult[0].count;
+        } catch (err) {
+          console.warn(`Could not count rows for table ${table.TABLE_NAME}:`, err.message);
+        }
+      }
+      
+      // Sync database_tables with actual MySQL tables
+      await syncDatabaseTables(row.id, userId);
+      
+      validDatabases.push({
+        id: row.id,
+        filename: row.filename,
+        mysqlSchemaName: row.mysql_schema_name,
+        tableCount: actualTables.length,
+        totalRows: totalRows,
+        created_at: row.created_at
+      });
+      
+    } catch (err) {
+      console.error(`❌ Error checking database ${row.id} (${schemaName}):`, err);
+      // Skip this database if there's an error
+      continue;
+    }
+  }
+  
+  return validDatabases;
+}
+
+// Clean up orphaned database entries (databases that no longer exist in MySQL)
+async function cleanupOrphanedDatabases(userId) {
+  await ensureSchema();
+  
+  try {
+    const [rows] = await pool.execute(
+      `SELECT d.id, d.mysql_schema_name FROM user_databases d WHERE d.user_id = ?`,
+      [String(userId)]
+    );
+    
+    for (const row of rows) {
+      const schemaName = row.mysql_schema_name;
+      
+      // Check if the schema exists in MySQL
+      const [schemaExists] = await pool.execute(
+        `SELECT COUNT(*) as count FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?`,
+        [schemaName]
+      );
+      
+      if (schemaExists[0].count === 0) {
+        console.log(`🗑️ Cleaning up orphaned database ${row.id} (schema: ${schemaName})`);
+        
+        // Delete from user_databases (this will cascade to database_tables)
+        await pool.execute(
+          `DELETE FROM user_databases WHERE id = ? AND user_id = ?`,
+          [row.id, String(userId)]
+        );
+      }
+    }
+    
+    return true;
+  } catch (err) {
+    console.error(`❌ Error cleaning up orphaned databases:`, err);
+    return false;
+  }
+}
+
+// Update database_tables when a table is dropped
+async function updateDatabaseTablesAfterDrop(dbId, userId, droppedTableName) {
+  await ensureSchema();
+  
+  try {
+    // Remove the dropped table from database_tables
+    const [result] = await pool.execute(
+      `DELETE FROM database_tables WHERE db_id = ? AND table_name = ?`,
+      [dbId, droppedTableName]
+    );
+    
+    console.log(`🗑️ Removed table ${droppedTableName} from database_tables for dbId ${dbId}`);
+    return result.affectedRows > 0;
+  } catch (err) {
+    console.error(`❌ Error updating database_tables after drop:`, err);
+    return false;
+  }
+}
+
+// Check if a table exists in the actual MySQL database
+async function tableExistsInDatabase(dbId, userId, tableName) {
+  await ensureSchema();
+  
+  try {
+    // Get database schema name
+    const [rows] = await pool.execute(
+      `SELECT mysql_schema_name FROM user_databases WHERE id = ? AND user_id = ?`,
+      [dbId, String(userId)]
+    );
+    
+    if (rows.length === 0) {
+      return false;
+    }
+    
+    const schemaName = rows[0].mysql_schema_name;
+    
+    // Check if table exists in MySQL
+    const [tableRows] = await pool.execute(
+      `SELECT COUNT(*) as count FROM INFORMATION_SCHEMA.TABLES 
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?`,
+      [schemaName, tableName]
+    );
+    
+    return tableRows[0].count > 0;
+  } catch (err) {
+    console.error(`❌ Error checking table existence:`, err);
+    return false;
+  }
+}
+
+// Sync database_tables with actual MySQL tables
+async function syncDatabaseTables(dbId, userId) {
+  await ensureSchema();
+  
+  try {
+    // Get database schema name
+    const [rows] = await pool.execute(
+      `SELECT mysql_schema_name FROM user_databases WHERE id = ? AND user_id = ?`,
+      [dbId, String(userId)]
+    );
+    
+    if (rows.length === 0) {
+      return false;
+    }
+    
+    const schemaName = rows[0].mysql_schema_name;
+    
+    // Get actual tables from MySQL
+    const [actualTables] = await pool.execute(
+      `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES 
+       WHERE TABLE_SCHEMA = ?`,
+      [schemaName]
+    );
+    
+    const actualTableNames = actualTables.map(t => t.TABLE_NAME);
+    
+    // Get tables from database_tables
+    const [dbTables] = await pool.execute(
+      `SELECT table_name, mysql_table_name FROM database_tables WHERE db_id = ?`,
+      [dbId]
+    );
+    
+    // Remove tables that no longer exist in MySQL
+    for (const dbTable of dbTables) {
+      if (!actualTableNames.includes(dbTable.mysql_table_name)) {
+        await pool.execute(
+          `DELETE FROM database_tables WHERE db_id = ? AND table_name = ?`,
+          [dbId, dbTable.table_name]
+        );
+        console.log(`🗑️ Synced: Removed non-existent table ${dbTable.table_name} from database_tables`);
+      }
+    }
+    
+    return true;
+  } catch (err) {
+    console.error(`❌ Error syncing database_tables:`, err);
+    return false;
+  }
 }
 
 module.exports = {
@@ -519,5 +705,9 @@ module.exports = {
   listUserDatabases,
   ensureSchema,
   initializeMySQL,
-  isMySQLAvailable
+  isMySQLAvailable,
+  updateDatabaseTablesAfterDrop,
+  tableExistsInDatabase,
+  syncDatabaseTables,
+  cleanupOrphanedDatabases
 };
