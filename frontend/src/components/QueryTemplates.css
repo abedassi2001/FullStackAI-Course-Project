@@ -173,6 +173,10 @@
   background: #795548;
 }
 
+.template-item.build::before {
+  background: #FF5722;
+}
+
 .templates-note {
   margin-top: 16px;
   padding: 12px 16px;

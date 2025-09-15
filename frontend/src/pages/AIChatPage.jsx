@@ -298,6 +298,40 @@ export default function AIChatPage() {
                     </div>
                   )}
                   
+                  {/* Database Schema Block (for database building) */}
+                  {msg.schema && (
+                    <div className="schema-block">
+                      <div className="schema-header">🏗️ Database Schema: {msg.schema.databaseName}</div>
+                      <div className="schema-info">
+                        <p><strong>Tables:</strong> {msg.schema.tables.length}</p>
+                        <p><strong>Total Rows:</strong> {msg.database?.totalRows || 0}</p>
+                      </div>
+                      <div className="schema-tables">
+                        {msg.schema.tables.map((table, idx) => (
+                          <div key={idx} className="table-info">
+                            <h4>📋 {table.name}</h4>
+                            <p className="table-description">{table.description}</p>
+                            <div className="table-columns">
+                              {table.columns.map((col, colIdx) => (
+                                <span key={colIdx} className="column-tag">
+                                  {col.name} ({col.type})
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* SQL DDL Block (for database building) */}
+                  {msg.sqlDDL && (
+                    <div className="sql-ddl-block">
+                      <div className="sql-ddl-header">💾 Generated SQL:</div>
+                      <pre className="sql-ddl-code">{msg.sqlDDL}</pre>
+                    </div>
+                  )}
+                  
                   <div className="message-time">
                     {msg.timestamp.toLocaleTimeString()}
                   </div>
