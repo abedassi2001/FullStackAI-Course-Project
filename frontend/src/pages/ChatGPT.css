@@ -181,6 +181,78 @@
   border-bottom-left-radius: 4px;
 }
 
+/* Message Text Styling */
+.message-text {
+  margin-bottom: 16px;
+  line-height: 1.7;
+  color: var(--text-primary);
+  font-size: 16px;
+  background-color: var(--accent-color);
+  padding: 16px 20px;
+  border-radius: 12px;
+  border-left: 4px solid var(--primary-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  font-weight: 400;
+}
+
+.message.user .message-text {
+  background-color: rgba(16, 163, 127, 0.1);
+  border-left-color: var(--primary-color);
+  color: var(--text-primary);
+}
+
+.message.assistant .message-text {
+  background-color: var(--accent-color);
+  border-left-color: var(--primary-color);
+  color: var(--text-primary);
+}
+
+/* Explanation Hidden Indicator */
+.explanation-hidden {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background-color: var(--background-color);
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-style: italic;
+  margin-bottom: 12px;
+}
+
+.explanation-hidden svg {
+  opacity: 0.6;
+}
+
+/* ChatGPT Explanation Block Styling */
+.chat-explanation-block {
+  margin-top: 16px;
+  background-color: var(--accent-color);
+  border-radius: 12px;
+  border-left: 4px solid var(--primary-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.chat-explanation-header {
+  background-color: var(--background-color);
+  padding: 12px 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 14px;
+}
+
+.chat-explanation-text {
+  padding: 16px 20px;
+  color: var(--text-primary);
+  line-height: 1.7;
+  font-size: 16px;
+  font-weight: 400;
+}
+
 /* Database Selector */
 .database-selector {
   padding: 20px;
@@ -206,6 +278,55 @@
   box-shadow: 0 0 0 2px rgba(16, 163, 127, 0.1);
 }
 
+/* Explanation Toggle */
+.explanation-toggle-container {
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--surface-color);
+  display: flex;
+  justify-content: center;
+}
+
+.explanation-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background-color: var(--background-color);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.explanation-toggle:hover {
+  background-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.explanation-toggle.active {
+  background-color: var(--primary-color);
+  color: white;
+  border-color: var(--primary-color);
+}
+
+.explanation-toggle:not(.active) {
+  background-color: var(--background-color);
+  color: var(--text-muted);
+  border-color: var(--border-color);
+}
+
+.explanation-toggle svg {
+  transition: transform 0.2s;
+}
+
+.explanation-toggle.active svg {
+  transform: rotate(180deg);
+}
+
 /* Input Area */
 .input-container {
   padding: 20px;
@@ -222,10 +343,18 @@
   display: flex;
   gap: 12px;
   align-items: flex-end;
+  position: relative;
+}
+
+.input-suggestions-container {
+  flex: 1;
+  position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 .message-input {
-  flex: 1;
+  width: 100%;
   padding: 12px 16px;
   border: 1px solid var(--border-color);
   border-radius: 24px;
@@ -238,6 +367,7 @@
   line-height: 1.5;
   background-color: var(--surface-color);
   color: var(--text-primary);
+  box-sizing: border-box;
 }
 
 .message-input:focus {
@@ -247,6 +377,130 @@
 
 .message-input::placeholder {
   color: var(--text-muted);
+}
+
+/* Suggestions Dropdown */
+.suggestions-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background-color: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  margin-bottom: 8px;
+  max-height: 300px;
+  overflow: hidden;
+}
+
+.suggestions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--background-color);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.suggestions-loading {
+  display: flex;
+  align-items: center;
+}
+
+.loading-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.loading-dots span {
+  width: 4px;
+  height: 4px;
+  background-color: var(--primary-color);
+  border-radius: 50%;
+  animation: loading-dots 1.4s infinite ease-in-out;
+}
+
+.loading-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.loading-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes loading-dots {
+  0%, 80%, 100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.suggestions-list {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-item:hover {
+  background-color: var(--border-color);
+}
+
+.suggestion-text {
+  flex: 1;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.4;
+  margin-right: 8px;
+}
+
+.suggestion-item svg {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: color 0.2s;
+}
+
+.suggestion-item:hover svg {
+  color: var(--primary-color);
+}
+
+/* Scrollbar for suggestions */
+.suggestions-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.suggestions-list::-webkit-scrollbar-track {
+  background: var(--background-color);
+}
+
+.suggestions-list::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+.suggestions-list::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
 
 .send-btn {

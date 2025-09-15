@@ -14,8 +14,13 @@ const ChatGPT = ({ createNewChat }) => {
   const [editingSql, setEditingSql] = useState(null);
   const [editedSql, setEditedSql] = useState('');
   const [isExecutingSql, setIsExecutingSql] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [showExplanations, setShowExplanations] = useState(false);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+  const suggestionsRef = useRef(null);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -65,6 +70,36 @@ const ChatGPT = ({ createNewChat }) => {
     }
   };
 
+  // Fetch suggestions
+  const fetchSuggestions = async (query = '') => {
+    if (query.length < 1) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    try {
+      setIsLoadingSuggestions(true);
+      const token = localStorage.getItem("token");
+      const params = new URLSearchParams({ q: query });
+      if (selectedDbId) params.append('dbId', selectedDbId);
+      
+      const res = await axios.get(`http://localhost:5000/ai/suggestions?${params}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (res.data.success) {
+        setSuggestions(res.data.suggestions || []);
+        setShowSuggestions(true);
+      }
+    } catch (err) {
+      console.error("Failed to fetch suggestions:", err);
+      setSuggestions([]);
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
+
   useEffect(() => {
     if (chatId) {
       fetchMessages();
@@ -74,6 +109,20 @@ const ChatGPT = ({ createNewChat }) => {
     }
     fetchDatabases();
   }, [chatId]);
+
+  // Debounced suggestions fetching
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (input.trim().length > 0) {
+        fetchSuggestions(input);
+      } else {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      }
+    }, 300); // 300ms delay
+
+    return () => clearTimeout(timeoutId);
+  }, [input, selectedDbId]);
 
   // Send message
   const sendMessage = async (e) => {
@@ -220,6 +269,26 @@ const ChatGPT = ({ createNewChat }) => {
     }
   };
 
+  // Handle suggestion selection
+  const selectSuggestion = (suggestion) => {
+    setInput(suggestion);
+    setShowSuggestions(false);
+    setSuggestions([]);
+    textareaRef.current?.focus();
+  };
+
+  // Handle clicking outside suggestions
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // If no chatId, show welcome screen
   if (!chatId) {
     return (
@@ -285,6 +354,22 @@ const ChatGPT = ({ createNewChat }) => {
         </div>
       )}
 
+      {/* Explanation Toggle */}
+      <div className="explanation-toggle-container">
+        <button
+          className={`explanation-toggle ${showExplanations ? 'active' : ''}`}
+          onClick={() => setShowExplanations(!showExplanations)}
+          title={showExplanations ? 'Hide explanations' : 'Show explanations'}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span>{showExplanations ? 'Hide Explanations' : 'Show Explanations'}</span>
+        </button>
+      </div>
+
       {/* Messages */}
       <div className="messages-container">
         {messages.length === 0 ? (
@@ -300,7 +385,20 @@ const ChatGPT = ({ createNewChat }) => {
                   {message.role === 'user' ? '👤' : '🤖'}
                 </div>
                 <div className="message-content">
-                  <div className="message-text">{message.content}</div>
+                  {showExplanations ? (
+                    <div className="message-text">{message.content}</div>
+                  ) : (
+                    message.content && (
+                      <div className="explanation-hidden">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                          <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        <span>Explanation hidden - click toggle to show</span>
+                      </div>
+                    )
+                  )}
                   
                   {/* SQL Query Block */}
                   {message.sql && (
@@ -382,10 +480,22 @@ const ChatGPT = ({ createNewChat }) => {
                   )}
                   
                   {/* ChatGPT Explanation Block */}
-                  {message.isDualResponse && message.chatExplanation && (
+                  {message.isDualResponse && message.chatExplanation && showExplanations && (
                     <div className="chat-explanation-block">
                       <div className="chat-explanation-header">🤖 AI Explanation:</div>
                       <div className="chat-explanation-text">{message.chatExplanation}</div>
+                    </div>
+                  )}
+                  
+                  {/* Hidden Explanation Indicator */}
+                  {message.isDualResponse && message.chatExplanation && !showExplanations && (
+                    <div className="explanation-hidden">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span>AI Explanation hidden - click toggle to show</span>
                     </div>
                   )}
                   
@@ -423,17 +533,57 @@ const ChatGPT = ({ createNewChat }) => {
       {/* Input Area */}
       <div className="input-container">
         <form onSubmit={sendMessage} className="input-form">
-          <div className="input-wrapper">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Message 2SQL AI..."
-              className="message-input"
-              rows={1}
-              disabled={isLoading}
-            />
+          <div className="input-wrapper" ref={suggestionsRef}>
+            <div className="input-suggestions-container">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                onFocus={() => {
+                  if (suggestions.length > 0) {
+                    setShowSuggestions(true);
+                  }
+                }}
+                placeholder="Message 2SQL AI..."
+                className="message-input"
+                rows={1}
+                disabled={isLoading}
+              />
+              
+              {/* Suggestions Dropdown */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="suggestions-dropdown">
+                  <div className="suggestions-header">
+                    <span>💡 Suggestions</span>
+                    {isLoadingSuggestions && (
+                      <div className="suggestions-loading">
+                        <div className="loading-dots">
+                          <span></span>
+                          <span></span>
+                          <span></span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="suggestions-list">
+                    {suggestions.map((suggestion, index) => (
+                      <div
+                        key={index}
+                        className="suggestion-item"
+                        onClick={() => selectSuggestion(suggestion)}
+                      >
+                        <span className="suggestion-text">{suggestion}</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                          <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            
             <button
               type="submit"
               disabled={isLoading || !input.trim()}

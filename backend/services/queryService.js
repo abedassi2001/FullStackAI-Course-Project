@@ -27,3 +27,7 @@ exports.deleteQuery = async (id) => {
   if (!query) throw new Error("Query not found");
   return query;
 };
+
+exports.getUserQueries = async (userId) => {
+  return await queryRepository.findByUserId(userId);
+};

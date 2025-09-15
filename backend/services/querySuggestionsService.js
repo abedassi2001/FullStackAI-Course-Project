@@ -1,5 +1,6 @@
 // backend/services/querySuggestionsService.js
 const queryService = require('./queryService');
+const chatService = require('./chatService');
 
 // Common query templates and patterns
 const QUERY_TEMPLATES = {
@@ -268,12 +269,34 @@ function getContextualSuggestions(schemaInfo, input = '') {
 // Get real-time suggestions as user types
 async function getRealtimeSuggestions(input, userId, schemaInfo = null) {
   try {
-    // Get user's query history
-    const userHistory = await queryService.getAllQueries();
+    // Get user's query history from both old query system and recent chat messages
+    const [userHistory, recentChats] = await Promise.all([
+      queryService.getUserQueries(userId),
+      chatService.getChats(userId)
+    ]);
+    
+    // Extract prompts from old query system
     const userPrompts = userHistory
-      .filter(q => q.userId === userId)
       .map(q => q.prompt)
-      .slice(0, 20);
+      .slice(0, 10);
+    
+    // Extract recent user messages from chat history
+    const recentMessages = [];
+    for (const chat of recentChats.slice(0, 5)) { // Get last 5 chats
+      try {
+        const messages = await chatService.getMessages(chat.id, userId);
+        const userMessages = messages
+          .filter(msg => msg.role === 'user')
+          .map(msg => msg.content)
+          .slice(0, 3); // Get last 3 messages per chat
+        recentMessages.push(...userMessages);
+      } catch (err) {
+        console.log('Could not fetch messages for chat:', chat.id);
+      }
+    }
+    
+    // Combine all user prompts
+    const allUserPrompts = [...userPrompts, ...recentMessages].slice(0, 20);
     
     // Generate suggestions
     let suggestions = [];
@@ -281,7 +304,7 @@ async function getRealtimeSuggestions(input, userId, schemaInfo = null) {
     if (schemaInfo) {
       suggestions = getContextualSuggestions(schemaInfo, input);
     } else {
-      suggestions = generateSmartSuggestions(input, userPrompts);
+      suggestions = generateSmartSuggestions(input, allUserPrompts);
     }
     
     // Filter suggestions based on input
