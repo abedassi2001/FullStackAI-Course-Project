@@ -1,21 +1,39 @@
-/* ChatGPTLayout.css - Clean sidebar layout */
+/* ChatGPTLayout.css - Unified theme with consistent colors */
+:root {
+  --primary-color: #10a37f;
+  --primary-hover: #0d8f6b;
+  --secondary-color: #2d2d30;
+  --background-color: #212121;
+  --surface-color: #2d2d30;
+  --border-color: #3d3d40;
+  --text-primary: #ffffff;
+  --text-secondary: #cccccc;
+  --text-muted: #999999;
+  --accent-color: rgba(18, 24, 38, 0.6);
+  --success-color: #10a37f;
+  --warning-color: #ffa500;
+  --error-color: #ff6b6b;
+}
+
 .chatgpt-layout {
   display: flex;
   height: 100vh;
-  background-color: #f7f7f8;
+  background-color: var(--background-color);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   overflow: hidden;
+  color: var(--text-primary);
 }
 
 .sidebar {
   width: 260px;
-  background-color: #202123;
-  color: white;
+  background-color: var(--surface-color);
+  color: var(--text-primary);
   display: flex;
   flex-direction: column;
   padding: 20px;
   overflow-y: auto;
   flex-shrink: 0;
+  border-right: 1px solid var(--border-color);
 }
 
 .sidebar-header {
@@ -28,7 +46,7 @@
 .new-chat-btn {
   width: 100%;
   padding: 12px;
-  background-color: #10a37f;
+  background-color: var(--primary-color);
   color: white;
   border: none;
   border-radius: 6px;
@@ -43,11 +61,11 @@
 }
 
 .new-chat-btn:hover:not(:disabled) {
-  background-color: #0d8f6b;
+  background-color: var(--primary-hover);
 }
 
 .new-chat-btn:disabled {
-  background-color: #666;
+  background-color: var(--text-muted);
   cursor: not-allowed;
 }
 
@@ -56,13 +74,13 @@
   padding: 8px;
   background: none;
   border: none;
-  color: white;
+  color: var(--text-primary);
   cursor: pointer;
   border-radius: 4px;
 }
 
 .sidebar-toggle:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--border-color);
 }
 
 .sidebar-content {
@@ -81,22 +99,25 @@
 .chat-item {
   padding: 12px;
   margin-bottom: 8px;
-  background-color: #2d2d30;
+  background-color: var(--background-color);
   border-radius: 6px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  border: 1px solid transparent;
 }
 
 .chat-item:hover {
-  background-color: #3d3d40;
+  background-color: var(--border-color);
+  border-color: var(--primary-color);
 }
 
 .chat-item.active {
-  background-color: #10a37f;
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
 }
 
 .chat-title {
@@ -112,13 +133,14 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--text-primary);
 }
 
 .delete-chat-btn {
   padding: 4px;
   background: none;
   border: none;
-  color: #999;
+  color: var(--text-muted);
   cursor: pointer;
   border-radius: 4px;
   opacity: 0;
@@ -131,12 +153,12 @@
 }
 
 .delete-chat-btn:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--error-color);
   color: white;
 }
 
 .sidebar-footer {
-  border-top: 1px solid #3d3d40;
+  border-top: 1px solid var(--border-color);
   padding-top: 20px;
 }
 
@@ -154,7 +176,7 @@
   padding: 12px;
   background: none;
   border: none;
-  color: #999;
+  color: var(--text-secondary);
   cursor: pointer;
   border-radius: 6px;
   transition: all 0.2s;
@@ -164,17 +186,17 @@
 }
 
 .nav-item:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: white;
+  background-color: var(--border-color);
+  color: var(--text-primary);
 }
 
 .nav-item.active {
-  background-color: rgba(16, 163, 127, 0.2);
-  color: #10a37f;
+  background-color: var(--accent-color);
+  color: var(--text-primary);
 }
 
 .user-section {
-  border-top: 1px solid #3d3d40;
+  border-top: 1px solid var(--border-color);
   padding-top: 20px;
 }
 
@@ -185,7 +207,7 @@
   padding: 12px;
   background: none;
   border: none;
-  color: #999;
+  color: var(--text-secondary);
   cursor: pointer;
   border-radius: 6px;
   transition: all 0.2s;
@@ -195,15 +217,15 @@
 }
 
 .user-btn:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: white;
+  background-color: var(--border-color);
+  color: var(--text-primary);
 }
 
 .main-content {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background-color: #f7f7f8;
+  background-color: var(--background-color);
   overflow: hidden;
 }
 

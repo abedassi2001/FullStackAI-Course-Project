@@ -1,6 +1,6 @@
 // backend/controllers/chatController.js
 const { requireAuth } = require("../middlewares/authMiddleware");
-const { generateSQL, explainResults, chat } = require("../services/aiService");
+const { generateSQL, explainResults, chat, generateChatTitle } = require("../services/aiService");
 const { detectIntent } = require("../services/intentRouter");
 const {
   getDatabaseSchema,
@@ -75,6 +75,19 @@ exports.sendMessage = async (req, res) => {
     // Set database selection if provided
     if (dbId) {
       await chatService.setDatabaseSelection(chatId, uid, dbId);
+    }
+
+    // Generate title for new chats (first message)
+    const existingMessages = await chatService.getMessages(chatId, uid);
+    if (existingMessages.length === 1) { // Only the user message we just added
+      try {
+        const title = await generateChatTitle(message);
+        await chatService.updateChatTitle(chatId, uid, title);
+        console.log(`📝 Generated chat title: ${title}`);
+      } catch (err) {
+        console.error('❌ Failed to generate chat title:', err);
+        // Continue without failing the request
+      }
     }
 
     // Use AI to intelligently detect intent

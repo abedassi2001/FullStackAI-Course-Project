@@ -256,14 +256,24 @@ async function updateChatTitle(chatId, userId, title) {
   await ensureChatTables();
   const pool = await getPool();
   
-  const [result] = await pool.execute(
-    `UPDATE chats SET title = ?, updated_at = CURRENT_TIMESTAMP 
-     WHERE id = ? AND user_id = ?`,
-    [title, chatId, String(userId)]
+  // Verify chat belongs to user
+  const [chatRows] = await pool.execute(
+    `SELECT id FROM chats WHERE id = ? AND user_id = ?`,
+    [chatId, String(userId)]
   );
 
-  return result.affectedRows > 0;
+  if (chatRows.length === 0) {
+    throw new Error('Chat not found or access denied');
+  }
+
+  await pool.execute(
+    `UPDATE chats SET title = ? WHERE id = ?`,
+    [title, chatId]
+  );
+
+  return { success: true };
 }
+
 
 // Delete chat
 async function deleteChat(chatId, userId) {

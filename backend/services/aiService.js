@@ -94,9 +94,27 @@ async function extractSchemaName(prompt) {
   return completion.choices[0].message.content.trim();
 }
 
+// Generate chat title from first message
+async function generateChatTitle(firstMessage) {
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    temperature: 0.3,
+    max_tokens: 30, // Short title
+    messages: [
+      {
+        role: "system",
+        content: `Generate a short, descriptive title (max 5 words) for a chat based on the first user message. Return only the title, no quotes or formatting.`
+      },
+      { role: "user", content: firstMessage },
+    ],
+  });
+  return completion.choices[0].message.content.trim();
+}
+
 module.exports = {
   generateSQL,
   explainResults,
   chat,
   extractSchemaName,
+  generateChatTitle,
 };
