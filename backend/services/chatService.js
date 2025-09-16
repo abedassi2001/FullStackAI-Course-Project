@@ -149,6 +149,11 @@ async function getMessages(chatId, userId) {
   await ensureChatTables();
   const pool = await getPool();
   
+  // Check if chatId is valid
+  if (!chatId || chatId === 'undefined' || chatId === 'null' || chatId === '') {
+    return [];
+  }
+  
   // Verify chat belongs to user
   const [chatRows] = await pool.execute(
     `SELECT id FROM chats WHERE id = ? AND user_id = ?`,
@@ -156,7 +161,7 @@ async function getMessages(chatId, userId) {
   );
 
   if (chatRows.length === 0) {
-    throw new Error('Chat not found or access denied');
+    return [];
   }
 
   const [rows] = await pool.execute(

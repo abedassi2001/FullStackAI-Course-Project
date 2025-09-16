@@ -75,13 +75,29 @@ function generateRandomData() {
 
   // Generate customers (50-100)
   const customerCount = getRandomNumber(50, 100);
+  const usedEmails = new Set();
   for (let i = 0; i < customerCount; i++) {
     const firstName = getRandomElement(firstNames);
     const lastName = getRandomElement(lastNames);
+    
+    // Generate unique email
+    let email;
+    let attempts = 0;
+    do {
+      email = getRandomEmail(firstName, lastName);
+      if (attempts > 0) {
+        // Add random number to make it unique
+        email = email.replace('@', `${attempts}@`);
+      }
+      attempts++;
+    } while (usedEmails.has(email) && attempts < 10);
+    
+    usedEmails.add(email);
+    
     data.customers.push({
       id: i + 1,
       name: `${firstName} ${lastName}`,
-      email: getRandomEmail(firstName, lastName),
+      email: email,
       phone: getRandomPhone(),
       city: getRandomElement(cities),
       country: getRandomElement(countries),

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './ChatGPT.css';
@@ -11,6 +11,7 @@ const ChatGPT = ({ createNewChat }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDbId, setSelectedDbId] = useState('');
   const [databases, setDatabases] = useState([]);
+  const [isLoadingDatabases, setIsLoadingDatabases] = useState(false);
   const [editingSql, setEditingSql] = useState(null);
   const [editedSql, setEditedSql] = useState('');
   const [isExecutingSql, setIsExecutingSql] = useState(false);
@@ -18,6 +19,7 @@ const ChatGPT = ({ createNewChat }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [showExplanations, setShowExplanations] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const suggestionsRef = useRef(null);
@@ -28,8 +30,11 @@ const ChatGPT = ({ createNewChat }) => {
   }, [messages]);
 
   // Fetch chat messages
-  const fetchMessages = async () => {
-    if (!chatId) return;
+  const fetchMessages = useCallback(async () => {
+    if (!chatId || chatId === 'undefined' || chatId === 'null') {
+      setMessages([]);
+      return;
+    }
     
     try {
       const token = localStorage.getItem("token");
@@ -54,12 +59,15 @@ const ChatGPT = ({ createNewChat }) => {
       setMessages(formattedMessages);
     } catch (err) {
       console.error("Failed to fetch messages:", err);
+      // Don't show error to user, just set empty messages
+      setMessages([]);
     }
-  };
+  }, [chatId]);
 
   // Fetch databases
-  const fetchDatabases = async () => {
+  const fetchDatabases = useCallback(async () => {
     try {
+      setIsLoadingDatabases(true);
       const token = localStorage.getItem("token");
       const res = await axios.get("http://localhost:5000/uploads", {
         headers: { Authorization: `Bearer ${token}` }
@@ -67,11 +75,13 @@ const ChatGPT = ({ createNewChat }) => {
       setDatabases(res.data.databases || []);
     } catch (err) {
       console.error("Failed to fetch databases:", err);
+    } finally {
+      setIsLoadingDatabases(false);
     }
-  };
+  }, []);
 
   // Fetch suggestions
-  const fetchSuggestions = async (query = '') => {
+  const fetchSuggestions = useCallback(async (query = '') => {
     if (query.length < 1) {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -98,7 +108,7 @@ const ChatGPT = ({ createNewChat }) => {
     } finally {
       setIsLoadingSuggestions(false);
     }
-  };
+  }, [selectedDbId]);
 
   useEffect(() => {
     if (chatId) {
@@ -108,7 +118,7 @@ const ChatGPT = ({ createNewChat }) => {
       setMessages([]);
     }
     fetchDatabases();
-  }, [chatId]);
+  }, [chatId, fetchMessages, fetchDatabases]);
 
   // Debounced suggestions fetching
   useEffect(() => {
@@ -122,7 +132,7 @@ const ChatGPT = ({ createNewChat }) => {
     }, 300); // 300ms delay
 
     return () => clearTimeout(timeoutId);
-  }, [input, selectedDbId]);
+  }, [input, selectedDbId, fetchSuggestions]);
 
   // Send message
   const sendMessage = async (e) => {
@@ -289,6 +299,49 @@ const ChatGPT = ({ createNewChat }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Export database to CSV
+  const exportDatabase = async (format = 'csv') => {
+    if (!selectedDbId) {
+      alert('Please select a database first');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`http://localhost:5000/uploads/export/${selectedDbId}/${format}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
+      });
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Get filename from response headers or create default
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `database_export_${new Date().toISOString().split('T')[0]}.${format}`;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+      
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert(`Export failed: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   // If no chatId, show welcome screen
   if (!chatId) {
     return (
@@ -337,24 +390,55 @@ const ChatGPT = ({ createNewChat }) => {
   return (
     <div className="chatgpt-page">
       {/* Database Selector */}
-      {databases.length > 0 && (
-        <div className="database-selector">
-          <select
-            value={selectedDbId}
-            onChange={(e) => setSelectedDbId(e.target.value)}
-            className="db-select"
+      <div className="database-selector">
+        <select
+          value={selectedDbId}
+          onChange={(e) => setSelectedDbId(e.target.value)}
+          className="db-select"
+          disabled={isLoadingDatabases}
+        >
+          <option value="">
+            {isLoadingDatabases ? 'Loading databases...' : 
+             databases.length === 0 ? 'No databases available - Upload one first' : 'Choose a database...'}
+          </option>
+          {databases.map((db) => (
+            <option key={db.id} value={db.id}>
+              {db.filename} ({db.tableCount} tables, {db.totalRows} rows)
+            </option>
+          ))}
+        </select>
+        {selectedDbId && (
+          <button
+            className="export-btn"
+            onClick={() => exportDatabase('csv')}
+            disabled={isExporting}
+            title="Export current database to CSV"
           >
-            <option value="">Choose a database...</option>
-            {databases.map((db) => (
-              <option key={db.id} value={db.id}>
-                {db.filename} ({db.tableCount} tables, {db.totalRows} rows)
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+            {isExporting ? (
+              <div className="loading-spinner">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15M17 8L12 3M12 3L7 8M12 3V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
+            {isExporting ? 'Exporting...' : 'Export CSV'}
+          </button>
+        )}
+        {databases.length === 0 && (
+          <div className="no-databases-message">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span>Go to Databases page to upload your first database</span>
+          </div>
+        )}
+      </div>
 
-      {/* Explanation Toggle */}
+      {/* Explanation Toggle and Export Buttons */}
       <div className="explanation-toggle-container">
         <button
           className={`explanation-toggle ${showExplanations ? 'active' : ''}`}
@@ -368,6 +452,49 @@ const ChatGPT = ({ createNewChat }) => {
           </svg>
           <span>{showExplanations ? 'Hide Explanations' : 'Show Explanations'}</span>
         </button>
+        
+        {selectedDbId && (
+          <div className="export-buttons-group">
+            <button
+              className="export-btn-small csv"
+              onClick={() => exportDatabase('csv')}
+              disabled={isExporting}
+              title="Export current database to CSV"
+            >
+              {isExporting ? (
+                <div className="loading-spinner-small">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15M17 8L12 3M12 3L7 8M12 3V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+              CSV
+            </button>
+            <button
+              className="export-btn-small json"
+              onClick={() => exportDatabase('json')}
+              disabled={isExporting}
+              title="Export current database to JSON"
+            >
+              {isExporting ? (
+                <div className="loading-spinner-small">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15M17 8L12 3M12 3L7 8M12 3V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+              JSON
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Messages */}
@@ -382,36 +509,27 @@ const ChatGPT = ({ createNewChat }) => {
             {messages.map((message, index) => (
               <div key={index} className={`message ${message.role}`}>
                 <div className="message-avatar">
-                  {message.role === 'user' ? '👤' : '🤖'}
+                  {/* Emoji added via CSS */}
                 </div>
                 <div className="message-content">
-                  {showExplanations ? (
+                  {/* Message Content - Always show */}
+                  {message.content && (
                     <div className="message-text">{message.content}</div>
-                  ) : (
-                    message.content && (
-                      <div className="explanation-hidden">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                          <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M2 17L12 22L22 17" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <path d="M2 12L12 17L22 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                        <span>Explanation hidden - click toggle to show</span>
-                      </div>
-                    )
                   )}
+                  
                   
                   {/* SQL Query Block */}
                   {message.sql && (
                     <div className="sql-block">
                       <div className="sql-header">
-                        🔍 SQL Query:
+                        SQL Query:
                         <div className="sql-actions">
                           <button 
                             className="sql-edit-btn"
                             onClick={() => startEditingSql(index, message.sql)}
                             title="Edit SQL"
                           >
-                            ✏️ Edit
+                            Edit
                           </button>
                         </div>
                       </div>
@@ -450,7 +568,7 @@ const ChatGPT = ({ createNewChat }) => {
                   {/* Data Results Block */}
                   {message.rows && message.rows.length > 0 && (
                     <div className="results-block">
-                      <div className="results-header">📊 Data ({message.rows.length} rows):</div>
+                      <div className="results-header">Data ({message.rows.length} rows):</div>
                       <div className="results-table">
                         <table>
                           <thead>
@@ -476,13 +594,62 @@ const ChatGPT = ({ createNewChat }) => {
                           </div>
                         )}
                       </div>
+                      {/* Export Buttons */}
+                      <div className="export-buttons-group">
+                        <button
+                          className="export-btn-small csv"
+                          onClick={() => exportDatabase('csv')}
+                          disabled={isExporting}
+                          title="Export current database to CSV"
+                        >
+                          {isExporting ? (
+                            <div className="loading-spinner-small">
+                              <span></span>
+                              <span></span>
+                              <span></span>
+                            </div>
+                          ) : (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M14 2v6h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M16 13H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M16 17H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M10 9H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                          CSV
+                        </button>
+                        <button
+                          className="export-btn-small json"
+                          onClick={() => exportDatabase('json')}
+                          disabled={isExporting}
+                          title="Export current database to JSON"
+                        >
+                          {isExporting ? (
+                            <div className="loading-spinner-small">
+                              <span></span>
+                              <span></span>
+                              <span></span>
+                            </div>
+                          ) : (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M14 2v6h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M16 13H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M16 17H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M10 9H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                          JSON
+                        </button>
+                      </div>
                     </div>
                   )}
                   
                   {/* ChatGPT Explanation Block */}
                   {message.isDualResponse && message.chatExplanation && showExplanations && (
                     <div className="chat-explanation-block">
-                      <div className="chat-explanation-header">🤖 AI Explanation:</div>
+                      <div className="chat-explanation-header">AI Explanation:</div>
                       <div className="chat-explanation-text">{message.chatExplanation}</div>
                     </div>
                   )}
@@ -502,7 +669,7 @@ const ChatGPT = ({ createNewChat }) => {
                   {/* Table Dropped Block */}
                   {message.tableDropped && (
                     <div className="table-dropped-block">
-                      <div className="table-dropped-header">🗑️ Table Dropped:</div>
+                      <div className="table-dropped-header">Table Dropped:</div>
                       <div className="table-dropped-info">
                         <p><strong>Table:</strong> {message.droppedTableName}</p>
                         <p><strong>Status:</strong> Successfully removed from database</p>
@@ -515,7 +682,7 @@ const ChatGPT = ({ createNewChat }) => {
             
             {isLoading && (
               <div className="message assistant">
-                <div className="message-avatar">🤖</div>
+                <div className="message-avatar"></div>
                 <div className="message-content">
                   <div className="typing-indicator">
                     <span></span>
@@ -555,7 +722,7 @@ const ChatGPT = ({ createNewChat }) => {
               {showSuggestions && suggestions.length > 0 && (
                 <div className="suggestions-dropdown">
                   <div className="suggestions-header">
-                    <span>💡 Suggestions</span>
+                    <span>Suggestions</span>
                     {isLoadingSuggestions && (
                       <div className="suggestions-loading">
                         <div className="loading-dots">

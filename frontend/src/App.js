@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
-import Dashboard from "./pages/Dashboard";
 import AIChatPage from "./pages/AIChatPage";
 import ChatGPT from "./pages/ChatGPT";
 import DatabaseManager from "./pages/DatabaseManager";
@@ -25,7 +24,7 @@ function ProtectedRoute({ children }) {
   return isAuthenticated ? children : <Navigate to="/login" />;
 }
 
-function PublicRoute({ children }) {
+function PublicRoute({ children, allowAuthenticated = false }) {
   const [isAuthenticated, setIsAuthenticated] = useState(null);
 
   useEffect(() => {
@@ -35,6 +34,11 @@ function PublicRoute({ children }) {
 
   if (isAuthenticated === null) {
     return <div className="loading">Loading...</div>;
+  }
+
+  // If allowAuthenticated is true, always show the children (for login/register pages)
+  if (allowAuthenticated) {
+    return children;
   }
 
   return isAuthenticated ? <Navigate to="/app" /> : children;
@@ -48,12 +52,12 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/homepage" element={<HomePage />} />
         <Route path="/login" element={
-          <PublicRoute>
+          <PublicRoute allowAuthenticated={true}>
             <LoginPage />
           </PublicRoute>
         } />
         <Route path="/register" element={
-          <PublicRoute>
+          <PublicRoute allowAuthenticated={true}>
             <RegisterPage />
           </PublicRoute>
         } />
@@ -95,14 +99,6 @@ export default function App() {
           </ProtectedRoute>
         } />
         
-        {/* Legacy Routes */}
-        <Route path="/dashboard" element={
-          <ProtectedRoute>
-            <ChatGPTLayout>
-              <Dashboard />
-            </ChatGPTLayout>
-          </ProtectedRoute>
-        } />
         <Route path="/ai-chat" element={
           <ProtectedRoute>
             <ChatGPTLayout>

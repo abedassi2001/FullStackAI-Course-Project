@@ -84,7 +84,7 @@ COMMON PATTERNS TO RECOGNIZE:
 - "Remove [record]" / "Delete [record]" → DELETE
 - "Drop [table]" / "Remove [table]" / "Delete [table]" → DROP TABLE
 - "Create table" / "Make a table" / "Create a [table] table" → CREATE TABLE
-- "Create schema" / "Create database" / "Create db" → CREATE TABLE (for schema creation)
+- "Create schema" / "Create database" / "Create db" → CREATE SCHEMA (for schema creation)
 - "List tables" / "Show tables" → SHOW TABLES
 - "Describe" / "Structure" → DESCRIBE/SHOW COLUMNS
 
@@ -93,9 +93,9 @@ IMPORTANT DISTINCTION:
 - "Create an album table" → CREATE TABLE album (...)
 - "Add a new customer" (when customer table exists) → INSERT INTO customer (...)
 - "Create a customer table" → CREATE TABLE customer (...)
-- "Create a schema called X" → CREATE TABLE X (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
-- "Create a database called X" → CREATE TABLE X (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
-- "Create a db called X" → CREATE TABLE X (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+- "Create a schema called X" → CREATE SCHEMA X
+- "Create a database called X" → CREATE SCHEMA X
+- "Create a db called X" → CREATE SCHEMA X
 - "Create random tables" → CREATE TABLE sample_data (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
 
 COMPOUND REQUESTS:

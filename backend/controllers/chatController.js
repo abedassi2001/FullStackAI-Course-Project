@@ -236,6 +236,98 @@ exports.sendMessage = async (req, res) => {
       }
     }
 
+    // Handle CREATE SCHEMA operations
+    if (lowerSql.includes('create schema') || lowerSql.includes('create database')) {
+      try {
+        console.log('🏗️ Processing CREATE SCHEMA operation');
+        
+        // Extract schema name from CREATE SCHEMA/DATABASE statement
+        const schemaMatch = lowerSql.match(/create\s+(?:schema|database)\s+(?:if\s+not\s+exists\s+)?[`"]?(\w+)[`"]?/i);
+        if (!schemaMatch) {
+          return res.status(400).json({ 
+            success: false, 
+            message: "Could not identify schema name in CREATE SCHEMA statement.",
+            sql,
+            intent: intent
+          });
+        }
+        
+        const schemaName = schemaMatch[1];
+        console.log(`🏗️ Creating schema: ${schemaName}`);
+        
+        // Create the schema using the sqliteToMysqlService
+        const { convertSqliteToMysql } = require("../services/sqliteToMysqlService");
+        
+        // Create a minimal SQLite buffer for the new schema
+        const fs = require('fs');
+        const path = require('path');
+        const tmpPath = path.join(__dirname, '../uploads/tmp', `temp_${Date.now()}.db`);
+        
+        // Create a temporary SQLite database with a basic table
+        const sqlite3 = require('sqlite3').verbose();
+        const tempDb = new sqlite3.Database(tmpPath);
+        
+        await new Promise((resolve, reject) => {
+          tempDb.serialize(() => {
+            tempDb.run(`CREATE TABLE IF NOT EXISTS ${schemaName} (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT,
+              description TEXT,
+              created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`);
+            tempDb.run(`INSERT INTO ${schemaName} (name, description) VALUES ('Sample Record', 'This is a sample record in your new schema')`);
+            tempDb.close((err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
+        });
+        
+        // Convert to MySQL
+        const buffer = fs.readFileSync(tmpPath);
+        const result = await convertSqliteToMysql(uid, `${schemaName}.db`, buffer);
+        
+        // Clean up temporary file
+        fs.unlinkSync(tmpPath);
+        
+        // Generate explanation
+        const explanation = `✅ Schema "${schemaName}" has been successfully created! You can now see it in your database list.`;
+        const chatExplanation = await chat(`I just created a new schema called "${schemaName}" for the user. Explain what this means and how they can use it.`, []);
+        
+        console.log(`✅ Schema ${schemaName} created successfully`);
+
+        // Save assistant message to database
+        await chatService.addMessage(chatId, uid, 'assistant', explanation, sql, null, {
+          isDualResponse: true,
+          chatExplanation: chatExplanation,
+          schemaCreated: true,
+          schemaName: schemaName,
+          newDbId: result.dbId,
+          intent: intent.intent
+        });
+
+        return res.json({ 
+          success: true, 
+          sql, 
+          explanation: explanation,
+          chatExplanation: chatExplanation,
+          isDualResponse: true,
+          schemaCreated: true,
+          schemaName: schemaName,
+          newDbId: result.dbId,
+          intent: intent
+        });
+      } catch (err) {
+        console.error("❌ CREATE SCHEMA error:", err);
+        return res.status(500).json({ 
+          success: false, 
+          message: `Failed to create schema: ${err.message}`,
+          sql,
+          intent: intent
+        });
+      }
+    }
+
     // Handle database queries
     if (intent.intent === "database_query") {
       const rows = await executeQueryOnUserDb(dbId, uid, sql);
