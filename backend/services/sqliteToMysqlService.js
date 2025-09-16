@@ -281,10 +281,10 @@ async function convertSqliteToMysql(userId, filename, sqliteBuffer, customSchema
     // Use custom schema name if provided, but sanitize it
     mysqlSchemaName = customSchemaName.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 64); // MySQL schema name limit
   } else {
-    // Generate default name if no custom name provided
+    // Generate default name using the original filename
+    const cleanFilename = filename.replace(/\.db$/i, '').replace(/[^a-zA-Z0-9_]/g, '_');
     const timestamp = Date.now().toString().slice(-8); // Last 8 digits
-    const baseName = filename.replace(/\.db$/i, '').replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 10); // Max 10 chars
-    mysqlSchemaName = `u${userId.slice(-6)}_${baseName}_${timestamp}`;
+    mysqlSchemaName = `${cleanFilename}_${timestamp}`;
   }
   
   // Create the MySQL schema (database)
@@ -593,65 +593,15 @@ async function listUserDatabases(userId) {
     [String(userId)]
   );
   
-  const validDatabases = [];
-  
-  for (const row of rows) {
-    const schemaName = row.mysql_schema_name;
-    
-    try {
-      // Check if the schema exists in MySQL
-      const [schemaExists] = await pool.execute(
-        `SELECT COUNT(*) as count FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?`,
-        [schemaName]
-      );
-      
-      if (schemaExists[0].count === 0) {
-        console.log(`🗑️ Schema ${schemaName} no longer exists in MySQL, skipping database ${row.id}`);
-        continue;
-      }
-      
-      // Get actual tables that exist in MySQL for this schema
-      const [actualTables] = await pool.execute(
-        `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ?`,
-        [schemaName]
-      );
-      
-      if (actualTables.length === 0) {
-        console.log(`🗑️ Schema ${schemaName} exists but has no tables, skipping database ${row.id}`);
-        continue;
-      }
-      
-      // Get row counts for existing tables
-      let totalRows = 0;
-      for (const table of actualTables) {
-        try {
-          const [countResult] = await pool.execute(
-            `SELECT COUNT(*) as count FROM \`${schemaName}\`.\`${table.TABLE_NAME}\``
-          );
-          totalRows += countResult[0].count;
-        } catch (err) {
-          console.warn(`Could not count rows for table ${table.TABLE_NAME}:`, err.message);
-        }
-      }
-      
-      // Sync database_tables with actual MySQL tables
-      await syncDatabaseTables(row.id, userId);
-      
-      validDatabases.push({
-        id: row.id,
-        filename: row.filename,
-        mysqlSchemaName: row.mysql_schema_name,
-        tableCount: actualTables.length,
-        totalRows: totalRows,
-        created_at: row.created_at
-      });
-      
-    } catch (err) {
-      console.error(`❌ Error checking database ${row.id} (${schemaName}):`, err);
-      // Skip this database if there's an error
-      continue;
-    }
-  }
+  // Fast version - just return basic info without expensive checks
+  const validDatabases = rows.map(row => ({
+    id: row.id,
+    filename: row.filename, // This should be the original filename
+    mysqlSchemaName: row.mysql_schema_name, // This is the MySQL schema name
+    tableCount: 0, // Will be updated when needed
+    totalRows: 0,  // Will be updated when needed
+    created_at: row.created_at
+  }));
   
   return validDatabases;
 }
@@ -804,5 +754,6 @@ module.exports = {
   updateDatabaseTablesAfterDrop,
   tableExistsInDatabase,
   syncDatabaseTables,
-  cleanupOrphanedDatabases
+  cleanupOrphanedDatabases,
+  get pool() { return pool; }
 };

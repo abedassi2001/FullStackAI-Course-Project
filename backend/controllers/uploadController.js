@@ -6,7 +6,6 @@ const {
   getDatabaseSchema,
   listUserDatabases,
   isMySQLAvailable,
-  cleanupOrphanedDatabases,
 } = require("../services/sqliteToMysqlService");
 const { generateRandomData, generateInsertStatements } = require("../utils/randomDataGenerator");
 const sqlite3 = require("sqlite3").verbose();
@@ -67,9 +66,6 @@ exports.listDBs = async (req, res) => {
     const uid = getUid(req);
     if (!uid) return res.status(401).json({ success: false, error: "Unauthorized" });
 
-    // Clean up orphaned databases first
-    await cleanupOrphanedDatabases(uid);
-    
     const databases = await listUserDatabases(uid);
     res.json({ success: true, databases });
   } catch (err) {
@@ -210,13 +206,16 @@ exports.createDemoDB = async (req, res) => {
     db.close();
 
     const buffer = fs.readFileSync(tmpPath);
-    const result = await convertSqliteToMysql(uid, "demo-database.db", buffer);
+    const timestamp = Date.now();
+    const demoFilename = `demo-database-${timestamp}.db`;
+    const result = await convertSqliteToMysql(uid, demoFilename, buffer);
 
     // cleanup temp demo file
     try { fs.unlinkSync(tmpPath); } catch (_) {}
 
     console.log(`✅ Demo database created successfully:`, {
       dbId: result.dbId,
+      filename: demoFilename,
       tables: result.totalTables,
       rows: result.totalRows
     });
@@ -224,7 +223,7 @@ exports.createDemoDB = async (req, res) => {
     res.json({ 
       success: true, 
       dbId: result.dbId, 
-      filename: "demo-database.db",
+      filename: demoFilename,
       mysqlSchemaName: result.mysqlSchemaName,
       tables: result.tables,
       totalTables: result.totalTables,

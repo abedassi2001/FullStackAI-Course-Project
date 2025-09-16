@@ -1,5 +1,5 @@
 // backend/controllers/exportController.js
-const { executeQueryOnUserDb } = require('../services/sqliteToMysqlService');
+const { executeQueryOnUserDb, pool } = require('../services/sqliteToMysqlService');
 
 function getUid(req) {
   return req.user?.id || req.user?._id || null;
@@ -22,9 +22,24 @@ exports.exportDatabase = async (req, res) => {
 
     console.log(`🔄 Exporting database ${dbId} to ${format.toUpperCase()} for user ${uid}`);
 
+    // Ensure pool is available - try to initialize if not available
+    let currentPool = pool;
+    if (!currentPool) {
+      console.log("🔄 MySQL pool not available, initializing...");
+      const { initializeMySQL } = require('../services/sqliteToMysqlService');
+      await initializeMySQL();
+      
+      // Get the pool again after initialization
+      const { pool: newPool } = require('../services/sqliteToMysqlService');
+      if (!newPool) {
+        console.error("❌ Failed to initialize MySQL pool");
+        return res.status(500).json({ success: false, error: "Database connection not available" });
+      }
+      currentPool = newPool;
+    }
+
     // Get all tables for this database
-    const { pool } = require('../utils/mysql.db');
-    const [rows] = await pool.execute(
+    const [rows] = await currentPool.execute(
       `SELECT mysql_schema_name FROM user_databases WHERE id = ? AND user_id = ?`,
       [dbId, String(uid)]
     );
@@ -36,7 +51,7 @@ exports.exportDatabase = async (req, res) => {
     const schemaName = rows[0].mysql_schema_name;
 
     // Get all tables in the schema
-    const [tables] = await pool.execute(
+    const [tables] = await currentPool.execute(
       `SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ?`,
       [schemaName]
     );
@@ -55,7 +70,7 @@ exports.exportDatabase = async (req, res) => {
       console.log(`📊 Exporting table: ${tableName}`);
 
       // Get table data
-      const [data] = await pool.execute(`SELECT * FROM \`${schemaName}\`.\`${tableName}\``);
+      const [data] = await currentPool.execute(`SELECT * FROM \`${schemaName}\`.\`${tableName}\``);
       
       if (format.toLowerCase() === 'json') {
         exportData[tableName] = data;

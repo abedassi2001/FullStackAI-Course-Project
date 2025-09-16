@@ -4,14 +4,18 @@ import './DatabaseManager.css';
 
 const DatabaseManager = () => {
   const [databases, setDatabases] = useState([]);
+  const [isLoadingDatabases, setIsLoadingDatabases] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [status, setStatus] = useState({ type: "", msg: "" });
+  const [exportingDb, setExportingDb] = useState(null);
+  const [selectedDbId, setSelectedDbId] = useState('');
   const fileInputRef = useRef(null);
 
   // Fetch databases
   const fetchDatabases = async () => {
     try {
+      setIsLoadingDatabases(true);
       const token = localStorage.getItem("token");
       const res = await axios.get("http://localhost:5000/uploads", {
         headers: { Authorization: `Bearer ${token}` }
@@ -19,6 +23,8 @@ const DatabaseManager = () => {
       setDatabases(res.data.databases || []);
     } catch (err) {
       console.error("Failed to fetch databases:", err);
+    } finally {
+      setIsLoadingDatabases(false);
     }
   };
 
@@ -144,6 +150,49 @@ const DatabaseManager = () => {
     }
   };
 
+  // Export database
+  const exportDatabase = async (dbId, format) => {
+    setExportingDb(dbId);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`http://localhost:5000/uploads/export/${dbId}/${format}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
+      });
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Get filename from response headers or create default
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `database_export_${new Date().toISOString().split('T')[0]}.${format}`;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+      
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      setStatus({ type: "success", msg: `Database exported as ${format.toUpperCase()}` });
+    } catch (err) {
+      console.error('Export failed:', err);
+      setStatus({ 
+        type: "error", 
+        msg: `Export failed: ${err.response?.data?.message || err.message}` 
+      });
+    } finally {
+      setExportingDb(null);
+    }
+  };
+
   return (
     <div className="database-manager">
       <div className="database-header">
@@ -234,8 +283,77 @@ const DatabaseManager = () => {
 
       {/* Database List */}
       <div className="databases-section">
-        <h2>Your Databases</h2>
-        {databases.length === 0 ? (
+        <div className="databases-header">
+          <h2>Your Databases</h2>
+          {databases.length > 0 && (
+            <div className="database-picker">
+              <select
+                value={selectedDbId || ''}
+                onChange={(e) => setSelectedDbId(e.target.value)}
+                className="db-picker-select"
+              >
+                <option value="">Select a database to export...</option>
+                {databases.map((db) => (
+                  <option key={db.id} value={db.id}>
+                    {db.filename} ({db.tableCount} tables, {db.totalRows} rows)
+                  </option>
+                ))}
+              </select>
+              {selectedDbId && (
+                <div className="quick-export-buttons">
+                  <button
+                    className="quick-export-btn csv"
+                    onClick={() => exportDatabase(selectedDbId, 'csv')}
+                    disabled={exportingDb === selectedDbId}
+                    title="Export selected database to CSV"
+                  >
+                    {exportingDb === selectedDbId ? (
+                      <div className="loading-spinner-small">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                      </div>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15M17 8L12 3M12 3L7 8M12 3V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                    CSV
+                  </button>
+                  <button
+                    className="quick-export-btn json"
+                    onClick={() => exportDatabase(selectedDbId, 'json')}
+                    disabled={exportingDb === selectedDbId}
+                    title="Export selected database to JSON"
+                  >
+                    {exportingDb === selectedDbId ? (
+                      <div className="loading-spinner-small">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                      </div>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15M17 8L12 3M12 3L7 8M12 3V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                    JSON
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        {isLoadingDatabases ? (
+          <div className="loading-state">
+            <div className="loading-spinner">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <h3>Loading databases...</h3>
+          </div>
+        ) : databases.length === 0 ? (
           <div className="empty-state">
             <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
               <path d="M4 7V4C4 3.44772 4.44772 3 5 3H19C19.5523 3 20 3.44772 20 4V7M4 7H20M4 7V20C4 20.5523 4.44772 21 5 21H19C19.5523 21 20 20.5523 20 20V7M8 11H16M8 15H16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -273,6 +391,46 @@ const DatabaseManager = () => {
                   </p>
                 </div>
                 <div className="database-actions">
+                  <div className="export-buttons">
+                    <button
+                      className="action-btn export csv"
+                      onClick={() => exportDatabase(db.id, 'csv')}
+                      disabled={exportingDb === db.id}
+                      title="Export as CSV"
+                    >
+                      {exportingDb === db.id ? (
+                        <div className="loading-spinner">
+                          <span></span>
+                          <span></span>
+                          <span></span>
+                        </div>
+                      ) : (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                          <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15M17 8L12 3M12 3L7 8M12 3V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                      CSV
+                    </button>
+                    <button
+                      className="action-btn export json"
+                      onClick={() => exportDatabase(db.id, 'json')}
+                      disabled={exportingDb === db.id}
+                      title="Export as JSON"
+                    >
+                      {exportingDb === db.id ? (
+                        <div className="loading-spinner">
+                          <span></span>
+                          <span></span>
+                          <span></span>
+                        </div>
+                      ) : (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                          <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15M17 8L12 3M12 3L7 8M12 3V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                      JSON
+                    </button>
+                  </div>
                   <button
                     className="action-btn delete"
                     onClick={() => deleteDatabase(db.id)}

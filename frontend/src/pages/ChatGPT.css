@@ -258,10 +258,15 @@
   padding: 20px;
   background-color: var(--surface-color);
   border-bottom: 1px solid var(--border-color);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .database-selector select {
-  width: 100%;
+  flex: 1;
+  min-width: 200px;
   max-width: 400px;
   padding: 12px;
   border: 1px solid var(--border-color);
@@ -278,13 +283,86 @@
   box-shadow: 0 0 0 2px rgba(16, 163, 127, 0.1);
 }
 
+.no-databases-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background-color: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 8px;
+  color: #ffc107;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.export-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.export-btn:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.export-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.loading-spinner {
+  display: flex;
+  gap: 2px;
+}
+
+.loading-spinner span {
+  width: 4px;
+  height: 4px;
+  background-color: currentColor;
+  border-radius: 50%;
+  animation: loading-bounce 1.4s ease-in-out infinite both;
+}
+
+.loading-spinner span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.loading-spinner span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes loading-bounce {
+  0%, 80%, 100% {
+    transform: scale(0);
+  }
+  40% {
+    transform: scale(1);
+  }
+}
+
 /* Explanation Toggle */
 .explanation-toggle-container {
   padding: 12px 20px;
   border-bottom: 1px solid var(--border-color);
   background-color: var(--surface-color);
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .explanation-toggle {
@@ -325,6 +403,69 @@
 
 .explanation-toggle.active svg {
   transform: rotate(180deg);
+}
+
+/* Export Buttons Group */
+.export-buttons-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.export-btn-small {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.export-btn-small:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.export-btn-small:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.export-btn-small.json {
+  background-color: #f39c12;
+}
+
+.export-btn-small.json:hover:not(:disabled) {
+  background-color: #e67e22;
+}
+
+.loading-spinner-small {
+  display: flex;
+  gap: 2px;
+}
+
+.loading-spinner-small span {
+  width: 3px;
+  height: 3px;
+  background-color: currentColor;
+  border-radius: 50%;
+  animation: loading-bounce 1.4s ease-in-out infinite both;
+}
+
+.loading-spinner-small span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.loading-spinner-small span:nth-child(2) {
+  animation-delay: -0.16s;
 }
 
 /* Input Area */
