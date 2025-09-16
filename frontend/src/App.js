@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
-import Dashboard from "./pages/Dashboard";
 import AIChatPage from "./pages/AIChatPage";
 import ChatGPT from "./pages/ChatGPT";
 import DatabaseManager from "./pages/DatabaseManager";
@@ -100,14 +99,6 @@ export default function App() {
           </ProtectedRoute>
         } />
         
-        {/* Legacy Routes */}
-        <Route path="/dashboard" element={
-          <ProtectedRoute>
-            <ChatGPTLayout>
-              <Dashboard />
-            </ChatGPTLayout>
-          </ProtectedRoute>
-        } />
         <Route path="/ai-chat" element={
           <ProtectedRoute>
             <ChatGPTLayout>

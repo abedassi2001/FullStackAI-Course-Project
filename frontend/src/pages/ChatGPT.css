@@ -180,26 +180,7 @@
   flex-direction: row-reverse;
 }
 
-.message-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  flex-shrink: 0;
-}
-
-.message.user .message-avatar {
-  background-color: var(--primary-color);
-  color: white;
-}
-
-.message.assistant .message-avatar {
-  background-color: var(--accent-color);
-  color: white;
-}
+/* Message avatar styles moved to Enhanced Emoji Styling section */
 
 .message-content {
   max-width: 70%;
@@ -456,12 +437,15 @@
   transform: rotate(180deg);
 }
 
-/* Emoji Styling */
+/* Enhanced Emoji Styling */
 .message-avatar {
-  font-size: 24px;
-  filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.6));
-  text-shadow: 0 0 12px rgba(139, 92, 246, 0.8);
+  font-size: 24px !important;
+  filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.6)) !important;
+  text-shadow: 0 0 12px rgba(139, 92, 246, 0.8) !important;
   position: relative;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .message-avatar::before {
@@ -479,68 +463,98 @@
 
 /* User Avatar */
 .message.user .message-avatar::after {
-  content: '👤';
-  filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.6));
-  text-shadow: 0 0 12px rgba(59, 130, 246, 0.8);
+  content: '👤' !important;
+  filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.6)) !important;
+  text-shadow: 0 0 12px rgba(59, 130, 246, 0.8) !important;
+  font-size: 20px !important;
 }
 
 /* Assistant Avatar */
 .message.assistant .message-avatar::after {
-  content: '🤖';
-  filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.6));
-  text-shadow: 0 0 12px rgba(139, 92, 246, 0.8);
+  content: '🤖' !important;
+  filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.6)) !important;
+  text-shadow: 0 0 12px rgba(139, 92, 246, 0.8) !important;
+  font-size: 20px !important;
 }
 
 /* SQL Query Header Emoji */
-.sql-header {
-  font-size: 16px;
-}
-
 .sql-header::before {
-  content: '🔍';
-  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.6));
-  text-shadow: 0 0 8px rgba(59, 130, 246, 0.8);
-  margin-right: 8px;
+  content: '🔍' !important;
+  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.6)) !important;
+  text-shadow: 0 0 8px rgba(59, 130, 246, 0.8) !important;
+  margin-right: 8px !important;
+  font-size: 16px !important;
 }
 
 /* Results Header Emoji */
 .results-header::before {
-  content: '📊';
-  filter: drop-shadow(0 0 6px rgba(6, 182, 212, 0.6));
-  text-shadow: 0 0 8px rgba(6, 182, 212, 0.8);
-  margin-right: 8px;
+  content: '📊' !important;
+  filter: drop-shadow(0 0 6px rgba(6, 182, 212, 0.6)) !important;
+  text-shadow: 0 0 8px rgba(6, 182, 212, 0.8) !important;
+  margin-right: 8px !important;
+  font-size: 16px !important;
 }
 
 /* AI Explanation Header Emoji */
 .chat-explanation-header::before {
-  content: '🤖';
-  filter: drop-shadow(0 0 6px rgba(139, 92, 246, 0.6));
-  text-shadow: 0 0 8px rgba(139, 92, 246, 0.8);
-  margin-right: 8px;
+  content: '🤖' !important;
+  filter: drop-shadow(0 0 6px rgba(139, 92, 246, 0.6)) !important;
+  text-shadow: 0 0 8px rgba(139, 92, 246, 0.8) !important;
+  margin-right: 8px !important;
+  font-size: 16px !important;
 }
 
 /* Table Dropped Header Emoji */
 .table-dropped-header::before {
-  content: '🗑️';
-  filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.6));
-  text-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
-  margin-right: 8px;
+  content: '🗑️' !important;
+  filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.6)) !important;
+  text-shadow: 0 0 8px rgba(239, 68, 68, 0.8) !important;
+  margin-right: 8px !important;
+  font-size: 16px !important;
 }
 
 /* Suggestions Header Emoji */
 .suggestions-header::before {
-  content: '💡';
-  filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.6));
-  text-shadow: 0 0 8px rgba(245, 158, 11, 0.8);
-  margin-right: 8px;
+  content: '💡' !important;
+  filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.6)) !important;
+  text-shadow: 0 0 8px rgba(245, 158, 11, 0.8) !important;
+  margin-right: 8px !important;
+  font-size: 16px !important;
 }
 
 /* Edit Button Emoji */
 .sql-edit-btn::before {
-  content: '✏️';
-  filter: drop-shadow(0 0 4px rgba(34, 197, 94, 0.6));
-  text-shadow: 0 0 6px rgba(34, 197, 94, 0.8);
-  margin-right: 6px;
+  content: '✏️' !important;
+  filter: drop-shadow(0 0 4px rgba(34, 197, 94, 0.6)) !important;
+  text-shadow: 0 0 6px rgba(34, 197, 94, 0.8) !important;
+  margin-right: 6px !important;
+  font-size: 14px !important;
+}
+
+/* Global emoji enhancement for all emojis in the page */
+.chatgpt-page * {
+  /* Enhanced emoji rendering */
+  font-feature-settings: "liga" 1, "kern" 1;
+  text-rendering: optimizeLegibility;
+}
+
+/* Force emoji visibility and color */
+.chatgpt-page [class*="emoji"], 
+.chatgpt-page [data-emoji],
+.chatgpt-page .emoji,
+.chatgpt-page .message-avatar::after,
+.chatgpt-page .sql-header::before,
+.chatgpt-page .results-header::before,
+.chatgpt-page .chat-explanation-header::before,
+.chatgpt-page .table-dropped-header::before,
+.chatgpt-page .suggestions-header::before,
+.chatgpt-page .sql-edit-btn::before {
+  filter: drop-shadow(0 0 6px rgba(139, 92, 246, 0.6)) !important;
+  text-shadow: 0 0 8px rgba(139, 92, 246, 0.8) !important;
+  display: inline-block !important;
+  transition: all 0.3s ease !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 /* Export Buttons Group */

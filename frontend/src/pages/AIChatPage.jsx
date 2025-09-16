@@ -242,10 +242,10 @@ export default function AIChatPage() {
       <div className="chat-header">
         <button
           className="back-btn"
-          onClick={() => navigate("/dashboard")}
+          onClick={() => navigate("/databases")}
           type="button"
         >
-          ← Back to Dashboard
+          ← Back to Databases
         </button>
       </div>
 
