@@ -31,7 +31,10 @@ const ChatGPT = ({ createNewChat }) => {
 
   // Fetch chat messages
   const fetchMessages = useCallback(async () => {
-    if (!chatId) return;
+    if (!chatId || chatId === 'undefined' || chatId === 'null') {
+      setMessages([]);
+      return;
+    }
     
     try {
       const token = localStorage.getItem("token");
@@ -56,6 +59,8 @@ const ChatGPT = ({ createNewChat }) => {
       setMessages(formattedMessages);
     } catch (err) {
       console.error("Failed to fetch messages:", err);
+      // Don't show error to user, just set empty messages
+      setMessages([]);
     }
   }, [chatId]);
 
@@ -504,7 +509,7 @@ const ChatGPT = ({ createNewChat }) => {
             {messages.map((message, index) => (
               <div key={index} className={`message ${message.role}`}>
                 <div className="message-avatar">
-                  {message.role === 'user' ? '👤' : '🤖'}
+                  {/* Emoji added via CSS */}
                 </div>
                 <div className="message-content">
                   {/* Message Content - Always show */}
@@ -512,18 +517,19 @@ const ChatGPT = ({ createNewChat }) => {
                     <div className="message-text">{message.content}</div>
                   )}
                   
+                  
                   {/* SQL Query Block */}
                   {message.sql && (
                     <div className="sql-block">
                       <div className="sql-header">
-                        🔍 SQL Query:
+                        SQL Query:
                         <div className="sql-actions">
                           <button 
                             className="sql-edit-btn"
                             onClick={() => startEditingSql(index, message.sql)}
                             title="Edit SQL"
                           >
-                            ✏️ Edit
+                            Edit
                           </button>
                         </div>
                       </div>
@@ -562,7 +568,7 @@ const ChatGPT = ({ createNewChat }) => {
                   {/* Data Results Block */}
                   {message.rows && message.rows.length > 0 && (
                     <div className="results-block">
-                      <div className="results-header">📊 Data ({message.rows.length} rows):</div>
+                      <div className="results-header">Data ({message.rows.length} rows):</div>
                       <div className="results-table">
                         <table>
                           <thead>
@@ -588,13 +594,62 @@ const ChatGPT = ({ createNewChat }) => {
                           </div>
                         )}
                       </div>
+                      {/* Export Buttons */}
+                      <div className="export-buttons-group">
+                        <button
+                          className="export-btn-small csv"
+                          onClick={() => exportDatabase('csv')}
+                          disabled={isExporting}
+                          title="Export current database to CSV"
+                        >
+                          {isExporting ? (
+                            <div className="loading-spinner-small">
+                              <span></span>
+                              <span></span>
+                              <span></span>
+                            </div>
+                          ) : (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M14 2v6h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M16 13H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M16 17H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M10 9H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                          CSV
+                        </button>
+                        <button
+                          className="export-btn-small json"
+                          onClick={() => exportDatabase('json')}
+                          disabled={isExporting}
+                          title="Export current database to JSON"
+                        >
+                          {isExporting ? (
+                            <div className="loading-spinner-small">
+                              <span></span>
+                              <span></span>
+                              <span></span>
+                            </div>
+                          ) : (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M14 2v6h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M16 13H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M16 17H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                              <path d="M10 9H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          )}
+                          JSON
+                        </button>
+                      </div>
                     </div>
                   )}
                   
                   {/* ChatGPT Explanation Block */}
                   {message.isDualResponse && message.chatExplanation && showExplanations && (
                     <div className="chat-explanation-block">
-                      <div className="chat-explanation-header">🤖 AI Explanation:</div>
+                      <div className="chat-explanation-header">AI Explanation:</div>
                       <div className="chat-explanation-text">{message.chatExplanation}</div>
                     </div>
                   )}
@@ -614,7 +669,7 @@ const ChatGPT = ({ createNewChat }) => {
                   {/* Table Dropped Block */}
                   {message.tableDropped && (
                     <div className="table-dropped-block">
-                      <div className="table-dropped-header">🗑️ Table Dropped:</div>
+                      <div className="table-dropped-header">Table Dropped:</div>
                       <div className="table-dropped-info">
                         <p><strong>Table:</strong> {message.droppedTableName}</p>
                         <p><strong>Status:</strong> Successfully removed from database</p>
@@ -627,7 +682,7 @@ const ChatGPT = ({ createNewChat }) => {
             
             {isLoading && (
               <div className="message assistant">
-                <div className="message-avatar">🤖</div>
+                <div className="message-avatar"></div>
                 <div className="message-content">
                   <div className="typing-indicator">
                     <span></span>
@@ -667,7 +722,7 @@ const ChatGPT = ({ createNewChat }) => {
               {showSuggestions && suggestions.length > 0 && (
                 <div className="suggestions-dropdown">
                   <div className="suggestions-header">
-                    <span>💡 Suggestions</span>
+                    <span>Suggestions</span>
                     {isLoadingSuggestions && (
                       <div className="suggestions-loading">
                         <div className="loading-dots">

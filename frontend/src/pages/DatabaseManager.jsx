@@ -195,10 +195,11 @@ const DatabaseManager = () => {
 
   return (
     <div className="database-manager">
-      <div className="database-header">
-        <h1>Database Manager</h1>
-        <p>Upload and manage your SQLite database files</p>
-      </div>
+      <div className="database-content">
+        <div className="database-header">
+          <h1>Database Manager</h1>
+          <p>Upload and manage your SQLite database files</p>
+        </div>
 
       {/* Upload Area */}
       <div className="upload-section">
@@ -452,6 +453,7 @@ const DatabaseManager = () => {
             {status.msg}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

@@ -1,23 +1,33 @@
 /* HomePage.css - Unified theme with consistent colors */
 :root {
-  --primary-color: #10a37f;
-  --primary-hover: #0d8f6b;
-  --secondary-color: #2d2d30;
-  --background-color: #212121;
-  --surface-color: #2d2d30;
-  --border-color: #3d3d40;
+  --primary-color: #8b5cf6;
+  --primary-hover: #7c3aed;
+  --secondary-color: #1e1b4b;
+  --background-color: #000000;
+  --surface-color: #1e1b4b;
+  --border-color: #3730a3;
   --text-primary: #ffffff;
-  --text-secondary: #cccccc;
-  --text-muted: #999999;
-  --accent-color: rgba(18, 24, 38, 0.6);
-  --success-color: #10a37f;
-  --warning-color: #ffa500;
-  --error-color: #ff6b6b;
+  --text-secondary: #e0e7ff;
+  --text-muted: #a5b4fc;
+  --accent-color: rgba(139, 92, 246, 0.1);
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --error-color: #ef4444;
+  
+  /* Gradient definitions */
+  --gradient-primary: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 50%, #06b6d4 100%);
+  --gradient-secondary: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #3730a3 100%);
+  --gradient-surface: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+  --gradient-accent: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(59, 130, 246, 0.1) 100%);
 }
 
 .homepage {
   min-height: 100vh;
-  background: linear-gradient(135deg, var(--background-color) 0%, var(--surface-color) 100%);
+  background: 
+    radial-gradient(circle at 20% 80%, rgba(139, 92, 246, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(59, 130, 246, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(6, 182, 212, 0.2) 0%, transparent 50%),
+    linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -26,11 +36,29 @@
   text-align: center;
   color: var(--text-primary);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  position: relative;
+  overflow: hidden;
+}
+
+.homepage::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 30% 20%, rgba(139, 92, 246, 0.1) 0%, transparent 70%),
+    radial-gradient(circle at 70% 80%, rgba(59, 130, 246, 0.1) 0%, transparent 70%);
+  animation: float 20s ease-in-out infinite;
+  z-index: 0;
 }
 
 .homepage-container {
   max-width: 800px;
   width: 100%;
+  position: relative;
+  z-index: 10;
 }
 
 .homepage-header {
@@ -159,7 +187,7 @@
 }
 
 .btn-primary {
-  background-color: var(--primary-color);
+  background: var(--gradient-primary);
   color: white;
   border: none;
   cursor: pointer;
@@ -168,7 +196,7 @@
 .btn-primary:hover {
   background-color: var(--primary-hover);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(16, 163, 127, 0.3);
+  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
 }
 
 .btn-secondary {
