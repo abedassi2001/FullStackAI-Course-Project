@@ -78,12 +78,13 @@ exports.sendMessage = async (req, res) => {
     }
 
     // Generate title for new chats (first message)
+    let generatedTitle = null;
     const existingMessages = await chatService.getMessages(chatId, uid);
     if (existingMessages.length === 1) { // Only the user message we just added
       try {
-        const title = await generateChatTitle(message);
-        await chatService.updateChatTitle(chatId, uid, title);
-        console.log(`📝 Generated chat title: ${title}`);
+        generatedTitle = await generateChatTitle(message);
+        await chatService.updateChatTitle(chatId, uid, generatedTitle);
+        console.log(`📝 Generated chat title: ${generatedTitle}`);
       } catch (err) {
         console.error('❌ Failed to generate chat title:', err);
         // Continue without failing the request
@@ -93,6 +94,8 @@ exports.sendMessage = async (req, res) => {
     // Use AI to intelligently detect intent
     const intent = await detectIntent(message, !!dbId);
     console.log(`🎯 Detected intent:`, intent);
+    console.log(`📝 Message: "${message}"`);
+    console.log(`🔍 Has database: ${!!dbId}`);
 
     // Handle general chat
     if (intent.intent === "general_chat") {
@@ -110,7 +113,8 @@ exports.sendMessage = async (req, res) => {
           success: true, 
           explanation: reply,
           isGeneralQuestion: true,
-          intent: intent
+          intent: intent,
+          title: generatedTitle
         });
       } catch (err) {
         console.error('❌ General chat error:', err);
@@ -138,7 +142,8 @@ exports.sendMessage = async (req, res) => {
       }
 
       // Create detailed schema description for AI
-      schemaText = schemaInfo.tables.map(table => {
+      const schemaName = schemaInfo.mysqlSchemaName;
+      schemaText = `DATABASE SCHEMA: ${schemaName}\n\n` + schemaInfo.tables.map(table => {
         if (!table.columns || table.columns.length === 0) {
           return `Table: ${table.name} - ${table.rowCount} rows\n  Columns: not available`;
         }
@@ -163,6 +168,7 @@ exports.sendMessage = async (req, res) => {
     // Generate SQL query based on intent
     const sql = (await generateSQL(message, schemaText, uid)).trim();
     console.log(`🔍 Generated SQL:`, sql);
+    console.log(`📊 Schema provided:`, schemaText);
 
     // Check if it's a dangerous operation
     const lowerSql = sql.toLowerCase().trim();
@@ -234,7 +240,8 @@ exports.sendMessage = async (req, res) => {
           isDualResponse: true,
           tableDropped: true,
           droppedTableName: tableName,
-          intent: intent
+          intent: intent,
+          title: generatedTitle
         });
       } catch (err) {
         console.error("❌ DROP TABLE error:", err);
@@ -328,7 +335,8 @@ exports.sendMessage = async (req, res) => {
           schemaCreated: true,
           schemaName: schemaName,
           newDbId: result.dbId,
-          intent: intent
+          intent: intent,
+          title: generatedTitle
         });
       } catch (err) {
         console.error("❌ CREATE SCHEMA error:", err);
@@ -370,7 +378,8 @@ exports.sendMessage = async (req, res) => {
         explanation: sqlExplanation,
         chatExplanation: chatExplanation,
         isDualResponse: true,
-        intent: intent
+        intent: intent,
+        title: generatedTitle
       });
     }
 
@@ -379,7 +388,8 @@ exports.sendMessage = async (req, res) => {
     return res.status(400).json({ 
       success: false, 
       message: "I'm not sure how to handle that request. Please try rephrasing your message.",
-      intent: intent
+      intent: intent,
+      title: generatedTitle
     });
 
   } catch (err) {

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import './ChatGPT.css';
 
-const ChatGPT = ({ createNewChat }) => {
+const ChatGPT = ({ createNewChat, updateChatTitle, setTitleLoadingState, currentChatId }) => {
   const { chatId } = useParams();
   const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
@@ -173,6 +173,12 @@ const ChatGPT = ({ createNewChat }) => {
     setInput('');
     setIsLoading(true);
 
+    // Check if this is the first message (only user message exists)
+    const isFirstMessage = messages.length === 0;
+    if (isFirstMessage && setTitleLoadingState) {
+      setTitleLoadingState(true);
+    }
+
     try {
       const token = localStorage.getItem("token");
       const res = await axios.post(`http://localhost:5000/chats/${currentChatId}/messages`, {
@@ -197,6 +203,11 @@ const ChatGPT = ({ createNewChat }) => {
 
       setMessages(prev => [...prev, assistantMessage]);
 
+      // Handle title update for first message
+      if (isFirstMessage && res.data.title && updateChatTitle) {
+        updateChatTitle(currentChatId, res.data.title);
+      }
+
       // Refresh databases if needed
       if (res.data.schemaCreated || res.data.tableDropped) {
         fetchDatabases();
@@ -211,6 +222,10 @@ const ChatGPT = ({ createNewChat }) => {
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      // Stop title loading
+      if (isFirstMessage && setTitleLoadingState) {
+        setTitleLoadingState(false);
+      }
     }
   };
 

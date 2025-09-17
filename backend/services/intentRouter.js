@@ -6,9 +6,11 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 function detectIntentFast(message) {
   const msg = message.toLowerCase();
   
-  // Database query keywords
+  // Database query keywords - enhanced for INSERT recognition
   const queryKeywords = ['show', 'get', 'find', 'select', 'insert', 'update', 'delete', 'add', 'change', 'remove', 'all table', 'table names', 'list tables'];
+  const insertKeywords = ['insert', 'add', 'create', 'put', 'insert into', 'add to', 'put in', 'add data', 'insert data', 'create data', 'put data', 'add new', 'insert new', 'create new', 'put new', 'add item', 'insert item', 'create item', 'put item'];
   const hasQueryKeywords = queryKeywords.some(keyword => msg.includes(keyword));
+  const hasInsertKeywords = insertKeywords.some(keyword => msg.includes(keyword));
   
   // Create keywords
   const createKeywords = ['create', 'make', 'build', 'new table', 'new database', 'new schema', 'random db', 'random database', 'random schema', 'random scheme', 'table called', 'table named'];
@@ -58,6 +60,16 @@ function detectIntentFast(message) {
     };
   }
   
+  // Check for INSERT operations first (highest priority)
+  if (hasInsertKeywords) {
+    return {
+      intent: 'database_query',
+      confidence: 0.95,
+      reasoning: 'Contains INSERT operation keywords',
+      requiresDatabase: true
+    };
+  }
+  
   if (hasQueryKeywords) {
     return {
       intent: 'database_query',
@@ -102,8 +114,19 @@ RULES:
 - "create random db/database/schema" → create_random_database
 - "create database/schema for [description]" → create_schema  
 - "create [table]" → create_table
+- "insert/add/put data into [table]" → database_query (INSERT operation)
+- "add [item] to [table]" → database_query (INSERT operation)
+- "insert [item] into [table]" → database_query (INSERT operation)
+- "create [item] in [table]" → database_query (INSERT operation)
+- "put [item] in [table]" → database_query (INSERT operation)
+- "add new [item]" → database_query (INSERT operation)
+- "insert new [item]" → database_query (INSERT operation)
+- "create new [item]" → database_query (INSERT operation)
+- "put new [item]" → database_query (INSERT operation)
 - "show/get/find [data]" → database_query
-- General conversation → general_chat`
+- General conversation → general_chat
+
+IMPORTANT: Any mention of adding, inserting, creating, or putting data/items into an existing table should be classified as database_query (INSERT operation).`
       },
       { role: "user", content: message },
     ],
