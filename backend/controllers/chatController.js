@@ -273,6 +273,8 @@ exports.sendMessage = async (req, res) => {
         const fs = require('fs');
         const path = require('path');
         const tmpPath = path.join(__dirname, '../uploads/tmp', `temp_${Date.now()}.db`);
+        const tmpDir = path.dirname(tmpPath);
+        if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
         
         // Create a temporary SQLite database with a basic table
         const sqlite3 = require('sqlite3').verbose();

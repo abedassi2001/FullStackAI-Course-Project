@@ -188,6 +188,23 @@ async function chat(prompt, context = []) {
   return completion.choices[0].message.content.trim();
 }
 
+// Generate a concise chat title from the first user message
+async function generateChatTitle(message) {
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    temperature: 0.2,
+    messages: [
+      {
+        role: "system",
+        content:
+          "Summarize the user's message into a short, 3–6 word chat title. No quotes or punctuation.",
+      },
+      { role: "user", content: message },
+    ],
+  });
+  return completion.choices[0].message.content.trim().slice(0, 80);
+}
+
 // Extract schema name from user request
 async function extractSchemaName(prompt) {
   const completion = await openai.chat.completions.create({
@@ -233,4 +250,4 @@ async function extractSchemaName(prompt) {
   return extractedName === "null" ? null : extractedName;
 }
 
-module.exports = { generateSQL, explainResults, chat, extractSchemaName };
+module.exports = { generateSQL, explainResults, chat, extractSchemaName, generateChatTitle };
