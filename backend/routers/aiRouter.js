@@ -245,6 +245,8 @@ Based on the user's description, create appropriate table structures. If the use
         
         const uniqueId = crypto.randomBytes(8).toString('hex');
         const tmpPath = path.join(os.tmpdir(), `temp_schema_${uniqueId}_${Date.now()}.db`);
+        const tmpDir = path.dirname(tmpPath);
+        if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
         let sqliteDb;
         
         try {

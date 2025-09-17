@@ -581,29 +581,34 @@ async function executeQueryOnUserDb(dbId, userId, query) {
   }
 }
 
-// Get list of user's databases
+// Get list of user's databases (with real table/row counts)
 async function listUserDatabases(userId) {
   await ensureSchema();
   
   const [rows] = await pool.execute(
-    `SELECT d.id, d.filename, d.mysql_schema_name, d.created_at
+    `SELECT 
+       d.id,
+       d.filename,
+       d.mysql_schema_name,
+       d.created_at,
+       COUNT(t.table_name) AS tableCount,
+       COALESCE(SUM(t.row_count), 0) AS totalRows
      FROM user_databases d
+     LEFT JOIN database_tables t ON d.id = t.db_id
      WHERE d.user_id = ?
+     GROUP BY d.id, d.filename, d.mysql_schema_name, d.created_at
      ORDER BY d.created_at DESC`,
     [String(userId)]
   );
   
-  // Fast version - just return basic info without expensive checks
-  const validDatabases = rows.map(row => ({
+  return rows.map(row => ({
     id: row.id,
-    filename: row.filename, // This should be the original filename
-    mysqlSchemaName: row.mysql_schema_name, // This is the MySQL schema name
-    tableCount: 0, // Will be updated when needed
-    totalRows: 0,  // Will be updated when needed
+    filename: row.filename,
+    mysqlSchemaName: row.mysql_schema_name,
+    tableCount: Number(row.tableCount) || 0,
+    totalRows: Number(row.totalRows) || 0,
     created_at: row.created_at
   }));
-  
-  return validDatabases;
 }
 
 // Clean up orphaned database entries (databases that no longer exist in MySQL)

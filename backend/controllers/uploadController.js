@@ -117,6 +117,8 @@ exports.createDemoDB = async (req, res) => {
     // Create a temporary SQLite DB file with realistic random data
     const os = require("os");
     const tmpPath = path.join(os.tmpdir(), `demo-${Date.now()}.db`);
+    const tmpDir = path.dirname(tmpPath);
+    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
 
     const db = new sqlite3.Database(tmpPath);
     await new Promise((resolve, reject) => {
