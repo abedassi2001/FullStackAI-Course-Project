@@ -48,8 +48,7 @@ export default function LoginPage() {
       if (data?.token) localStorage.setItem("token", data.token);
       if (data?.user) localStorage.setItem("user", JSON.stringify(data.user));
 
-      alert("Login successful!");
-      navigate("/dashboard");
+      navigate("/app");
     } catch (err) {
       alert(`Network error: ${err?.message || "Failed to reach server"}`);
     } finally {
@@ -58,56 +57,48 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="hero">
-      <div className="noise"></div>
-
-      <header className="hero__nav">
-        <Link to="/" className="brand">2SQL</Link>
-      </header>
-
-      <main className="hero__content">
-        <h1 className="title">Sign in to <span>2SQL</span> 🔑</h1>
-        <p className="subtitle">Enter your email and password to access your account.</p>
+    <div className="login-page">
+      <div className="login-container">
+        <h1>Sign in to 2SQL</h1>
+        <p>Enter your email and password to access your account.</p>
 
         <form className="login-form" onSubmit={handleSubmit}>
-          <label>
-            Email
+          <div className="form-group">
+            <label htmlFor="email">Email</label>
             <input
               type="email"
+              id="email"
               name="email"
               placeholder="you@example.com"
               value={form.email}
               onChange={handleChange}
               required
             />
-          </label>
+          </div>
 
-          <label>
-            Password
+          <div className="form-group">
+            <label htmlFor="password">Password</label>
             <input
               type="password"
+              id="password"
               name="password"
               placeholder="Enter your password"
               value={form.password}
               onChange={handleChange}
               required
             />
-          </label>
+          </div>
 
           <button type="submit" className="btn btn-primary" disabled={loading}>
             {loading ? "Logging in..." : "Log In"}
           </button>
         </form>
 
-        <div className="actions">
-          <span className="muted">Don't have an account? </span>
-          <Link to="/register" className="btn btn-ghost">Register</Link>
+        <div className="login-footer">
+          <span>Don't have an account? </span>
+          <Link to="/register">Register</Link>
         </div>
-      </main>
-
-      <footer className="hero__footer">
-        <span>© {new Date().getFullYear()} 2SQL</span>
-      </footer>
+      </div>
     </div>
   );
 }

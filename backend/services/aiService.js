@@ -1,4 +1,3 @@
-// backend/services/aiService.js
 const OpenAI = require("openai");
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -12,12 +11,20 @@ async function generateSQL(prompt, schemaText, userId) {
         role: "system",
         content: `You are an expert SQL assistant that converts natural language to MySQL queries. 
 
+SCHEMA UNDERSTANDING:
+The provided schema shows tables with their columns and constraints. Each table entry shows:
+- Table name and row count
+- Column details: name (type) [constraints]
+- PRIMARY KEY columns are auto-incrementing and can be omitted from INSERT statements
+- NULL/NOT NULL constraints must be respected
+
 CORE CAPABILITIES:
 - SELECT queries: Retrieve and analyze data
 - INSERT queries: Add new records
 - UPDATE queries: Modify existing records  
 - DELETE queries: Remove records
 - CREATE TABLE queries: Create new tables
+- DROP TABLE queries: Remove tables
 - Metadata queries: Show database structure
 
 QUERY EXAMPLES BY CATEGORY:
@@ -36,6 +43,9 @@ QUERY EXAMPLES BY CATEGORY:
 - "Add a new employee with name 'Alice' and department 'IT'" → INSERT INTO employees (name, department) VALUES ('Alice', 'IT');
 - "Add a new customer with id 1, name 'John', email 'john@test.com', city 'New York'" → INSERT INTO customers (id, name, email, city) VALUES (1, 'John', 'john@test.com', 'New York');
 - "Insert a new album with title 'Greatest Hits' and artistId 5" → INSERT INTO album (Title, ArtistId) VALUES ('Greatest Hits', 5);
+- "Add a test item with id 15 name abed description random" → INSERT INTO test (id, name, description) VALUES (15, 'abed', 'random');
+- "Insert to the table called test a row with id = 15 name = abed and description = random" → INSERT INTO test (id, name, description) VALUES (15, 'abed', 'random');
+- "Add a random row to the table" → INSERT INTO test (name, description) VALUES ('Random Item', 'Random Description');
 
 ✏️ UPDATE QUERIES (Modify Data):
 - "Change John's city to Los Angeles" → UPDATE customers SET city = 'Los Angeles' WHERE name = 'John';
@@ -46,6 +56,12 @@ QUERY EXAMPLES BY CATEGORY:
 - "Remove customer with email john@test.com" → DELETE FROM customers WHERE email = 'john@test.com';
 - "Delete all products with price less than 50" → DELETE FROM products WHERE price < 50;
 - "Remove employees from the old department" → DELETE FROM employees WHERE department = 'old department';
+
+🗑️ DROP TABLE QUERIES (Remove Tables):
+- "Drop the customers table" → DROP TABLE customers;
+- "Remove the products table" → DROP TABLE products;
+- "Delete the old_orders table" → DROP TABLE old_orders;
+- "Drop table if exists temp_data" → DROP TABLE IF EXISTS temp_data;
 
 🏗️ CREATE TABLE QUERIES (Database Structure):
 - "Create a users table with name, email, and created_at" → CREATE TABLE users (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), email VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
@@ -69,15 +85,20 @@ IMPORTANT RULES:
 6. Use MySQL syntax, not SQLite
 7. ONLY use tables that exist in the provided schema - never create INSERT/UPDATE/DELETE queries for non-existent tables
 8. For INSERT queries, provide actual values instead of placeholders (?, ?, ?)
+9. When inserting data, use the exact column names from the schema (case-sensitive)
+10. For INSERT queries, only include columns that exist in the table schema
+11. If a column is PRIMARY KEY and AUTO_INCREMENT, you can omit it from INSERT statements
+12. Pay attention to NULL/NOT NULL constraints when inserting data
 
 COMMON PATTERNS TO RECOGNIZE:
 - "Show me" / "Display" / "Get" / "Find" → SELECT
 - "Add a new [record]" / "Insert [record]" / "Create a new [record]" → INSERT (when table exists)
 - "Add [table] with [fields]" / "Create [table] with [fields]" → INSERT (when table exists)
 - "Change" / "Update" / "Modify" → UPDATE
-- "Remove" / "Delete" → DELETE
+- "Remove [record]" / "Delete [record]" → DELETE
+- "Drop [table]" / "Remove [table]" / "Delete [table]" → DROP TABLE
 - "Create table" / "Make a table" / "Create a [table] table" → CREATE TABLE
-- "Create schema" / "Create database" / "Create db" → CREATE TABLE (for schema creation)
+- "Create schema" / "Create database" / "Create db" → CREATE SCHEMA (for schema creation)
 - "List tables" / "Show tables" → SHOW TABLES
 - "Describe" / "Structure" → DESCRIBE/SHOW COLUMNS
 
@@ -86,9 +107,9 @@ IMPORTANT DISTINCTION:
 - "Create an album table" → CREATE TABLE album (...)
 - "Add a new customer" (when customer table exists) → INSERT INTO customer (...)
 - "Create a customer table" → CREATE TABLE customer (...)
-- "Create a schema called X" → CREATE TABLE X (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
-- "Create a database called X" → CREATE TABLE X (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
-- "Create a db called X" → CREATE TABLE X (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+- "Create a schema called X" → CREATE SCHEMA X
+- "Create a database called X" → CREATE SCHEMA X
+- "Create a db called X" → CREATE SCHEMA X
 - "Create random tables" → CREATE TABLE sample_data (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
 
 COMPOUND REQUESTS:

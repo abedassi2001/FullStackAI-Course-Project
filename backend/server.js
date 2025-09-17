@@ -21,6 +21,11 @@ const PORT = process.env.PORT || 5000;
       await sequelize.authenticate();
       await sequelize.sync({ alter: true });
       console.log("✅ MySQL connected and tables synced");
+      
+      // Also initialize the mysql2 pool for sqliteToMysqlService
+      const { initializeMySQL } = require("./services/sqliteToMysqlService");
+      await initializeMySQL();
+      console.log("✅ MySQL pool initialized for database operations");
     } else {
       console.log("ℹ️ Skipping MySQL init (set USE_MYSQL=true to enable)");
     }
