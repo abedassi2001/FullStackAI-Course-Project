@@ -139,7 +139,18 @@ exports.sendMessage = async (req, res) => {
 
       // Create detailed schema description for AI
       schemaText = schemaInfo.tables.map(table => {
-        const columns = table.columns ? table.columns.map(col => `${col.name} (${col.type})`).join(', ') : 'columns not available';
+        if (!table.columns || table.columns.length === 0) {
+          return `Table: ${table.name} - ${table.rowCount} rows\n  Columns: not available`;
+        }
+        
+        const columns = table.columns.map(col => {
+          let colInfo = `${col.name} (${col.type})`;
+          if (col.isPrimaryKey) colInfo += ' PRIMARY KEY';
+          if (col.nullable) colInfo += ' NULL';
+          else colInfo += ' NOT NULL';
+          return colInfo;
+        }).join(', ');
+        
         return `Table: ${table.name} - ${table.rowCount} rows\n  Columns: ${columns}`;
       }).join('\n\n');
 

@@ -11,6 +11,13 @@ async function generateSQL(prompt, schemaText, userId) {
         role: "system",
         content: `You are an expert SQL assistant that converts natural language to MySQL queries. 
 
+SCHEMA UNDERSTANDING:
+The provided schema shows tables with their columns and constraints. Each table entry shows:
+- Table name and row count
+- Column details: name (type) [constraints]
+- PRIMARY KEY columns are auto-incrementing and can be omitted from INSERT statements
+- NULL/NOT NULL constraints must be respected
+
 CORE CAPABILITIES:
 - SELECT queries: Retrieve and analyze data
 - INSERT queries: Add new records
@@ -36,6 +43,9 @@ QUERY EXAMPLES BY CATEGORY:
 - "Add a new employee with name 'Alice' and department 'IT'" → INSERT INTO employees (name, department) VALUES ('Alice', 'IT');
 - "Add a new customer with id 1, name 'John', email 'john@test.com', city 'New York'" → INSERT INTO customers (id, name, email, city) VALUES (1, 'John', 'john@test.com', 'New York');
 - "Insert a new album with title 'Greatest Hits' and artistId 5" → INSERT INTO album (Title, ArtistId) VALUES ('Greatest Hits', 5);
+- "Add a test item with id 15 name abed description random" → INSERT INTO test (id, name, description) VALUES (15, 'abed', 'random');
+- "Insert to the table called test a row with id = 15 name = abed and description = random" → INSERT INTO test (id, name, description) VALUES (15, 'abed', 'random');
+- "Add a random row to the table" → INSERT INTO test (name, description) VALUES ('Random Item', 'Random Description');
 
 ✏️ UPDATE QUERIES (Modify Data):
 - "Change John's city to Los Angeles" → UPDATE customers SET city = 'Los Angeles' WHERE name = 'John';
@@ -75,6 +85,10 @@ IMPORTANT RULES:
 6. Use MySQL syntax, not SQLite
 7. ONLY use tables that exist in the provided schema - never create INSERT/UPDATE/DELETE queries for non-existent tables
 8. For INSERT queries, provide actual values instead of placeholders (?, ?, ?)
+9. When inserting data, use the exact column names from the schema (case-sensitive)
+10. For INSERT queries, only include columns that exist in the table schema
+11. If a column is PRIMARY KEY and AUTO_INCREMENT, you can omit it from INSERT statements
+12. Pay attention to NULL/NOT NULL constraints when inserting data
 
 COMMON PATTERNS TO RECOGNIZE:
 - "Show me" / "Display" / "Get" / "Find" → SELECT
