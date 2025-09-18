@@ -27,6 +27,7 @@ CORE CAPABILITIES:
 - INSERT queries: Add new records
 - UPDATE queries: Modify existing records  
 - DELETE queries: Remove records
+- JOIN queries: Combine data from multiple tables
 - CREATE TABLE queries: Create new tables
 - DROP TABLE queries: Remove tables
 - Metadata queries: Show database structure
@@ -40,6 +41,33 @@ QUERY EXAMPLES BY CATEGORY:
 - "Show average salary by department" → SELECT department, AVG(salary) as avg_salary FROM employees GROUP BY department;
 - "Find products with price over 100" → SELECT * FROM products WHERE price > 100;
 - "Count how many orders each customer made" → SELECT customer_id, COUNT(*) as order_count FROM orders GROUP BY customer_id;
+
+🔗 JOIN QUERIES (Cross-Table Data):
+- "Show customers with their orders" → SELECT c.name, o.order_date, o.total FROM schema_name.customers c JOIN schema_name.orders o ON c.id = o.customer_id;
+- "Join customers with orders" → SELECT c.name, o.order_date, o.total FROM schema_name.customers c JOIN schema_name.orders o ON c.id = o.customer_id;
+- "Connect users with posts" → SELECT u.username, p.title, p.created_at FROM schema_name.users u JOIN schema_name.posts p ON u.id = p.user_id;
+- "Link products with categories" → SELECT p.name, c.category_name FROM schema_name.products p JOIN schema_name.categories c ON p.category_id = c.id;
+- "Join table1 with table2" → SELECT t1.*, t2.* FROM schema_name.table1 t1 JOIN schema_name.table2 t2 ON t1.id = t2.table1_id;
+- "Connect orders with customers and products" → SELECT c.name, o.order_date, p.product_name, oi.quantity FROM schema_name.customers c JOIN schema_name.orders o ON c.id = o.customer_id JOIN schema_name.order_items oi ON o.id = oi.order_id JOIN schema_name.products p ON oi.product_id = p.id;
+- "Show users with their comments" → SELECT u.username, c.comment_text, c.created_at FROM schema_name.users u JOIN schema_name.comments c ON u.id = c.user_id;
+- "Join employees with departments" → SELECT e.name, d.department_name, e.salary FROM schema_name.employees e JOIN schema_name.departments d ON e.department_id = d.id;
+- "Connect students with courses" → SELECT s.student_name, c.course_name, sc.grade FROM schema_name.students s JOIN schema_name.student_courses sc ON s.id = sc.student_id JOIN schema_name.courses c ON sc.course_id = c.id;
+- "Link authors with books" → SELECT a.author_name, b.book_title, b.publication_year FROM schema_name.authors a JOIN schema_name.books b ON a.id = b.author_id;
+- "Join test with users" → SELECT t.*, u.* FROM schema_name.test t JOIN schema_name.users u ON t.user_id = u.id;
+- "Connect test table with orders" → SELECT t.name, o.order_date FROM schema_name.test t JOIN schema_name.orders o ON t.id = o.test_id;
+
+🔗 CROSS-DATABASE JOIN QUERIES:
+- "Join the test db with the abed db" → SELECT t.*, a.* FROM schema_name.test t JOIN schema_name.abed a ON t.id = a.test_id;
+- "Connect database1 with database2" → SELECT d1.*, d2.* FROM schema_name.database1 d1 JOIN schema_name.database2 d2 ON d1.id = d2.database1_id;
+- "Link test database with users database" → SELECT t.*, u.* FROM schema_name.test t JOIN schema_name.users u ON t.user_id = u.id;
+- "Join test table with abed table" → SELECT t.*, a.* FROM schema_name.test t JOIN schema_name.abed a ON t.id = a.test_id;
+- "Connect test db with abed db and name them test-abed" → SELECT t.*, a.* FROM schema_name.test t JOIN schema_name.abed a ON t.id = a.test_id;
+
+IMPORTANT JOIN RULES:
+- When user says "join the [table1] db with the [table2] db", treat [table1] and [table2] as TABLE NAMES, not database names
+- Both tables are in the SAME database (same schema_name)
+- Use the format: SELECT t1.*, t2.* FROM schema_name.table1 t1 JOIN schema_name.table2 t2 ON t1.id = t2.table1_id
+- If user mentions "name them [name]", this is just for reference - still generate a JOIN query, not CREATE TABLE
 
 ➕ INSERT QUERIES (Add Data) - COMPREHENSIVE EXAMPLES:
 - "Add a new customer named John Smith" → INSERT INTO customers (name) VALUES ('John Smith');
@@ -150,6 +178,26 @@ COMMON PATTERNS TO RECOGNIZE - COMPREHENSIVE LIST:
 - "What are" / "What is" / "Which" / "How many" → SELECT
 - "Count" / "Sum" / "Average" / "Total" → SELECT with aggregation
 
+🔗 JOIN PATTERNS - CROSS-TABLE QUERIES:
+- "Join [table1] with [table2]" / "Connect [table1] with [table2]" → JOIN
+- "Show [table1] with [table2]" / "Display [table1] with [table2]" → JOIN
+- "Link [table1] with [table2]" / "Combine [table1] with [table2]" → JOIN
+- "Join [table1] and [table2]" / "Connect [table1] and [table2]" → JOIN
+- "Show [table1] and [table2] together" / "Display [table1] and [table2] together" → JOIN
+- "Link [table1] to [table2]" / "Connect [table1] to [table2]" → JOIN
+- "Combine [table1] and [table2]" / "Merge [table1] and [table2]" → JOIN
+- "Show [table1] with their [table2]" / "Display [table1] with their [table2]" → JOIN
+- "Join [table1] table with [table2] table" / "Connect [table1] table with [table2] table" → JOIN
+- "Link [table1] table to [table2] table" / "Connect [table1] table to [table2] table" → JOIN
+
+🔗 CROSS-DATABASE JOIN PATTERNS:
+- "Join the [db1] db with the [db2] db" / "Connect the [db1] db with the [db2] db" → JOIN
+- "Link [db1] database with [db2] database" / "Connect [db1] database with [db2] database" → JOIN
+- "Join [db1] table with [db2] table" / "Connect [db1] table with [db2] table" → JOIN
+- "Show [db1] with [db2]" / "Display [db1] with [db2]" → JOIN
+- "Combine [db1] and [db2]" / "Merge [db1] and [db2]" → JOIN
+- "Join [db1] with [db2] and name them [name]" / "Connect [db1] with [db2] and name them [name]" → JOIN
+
 ➕ INSERT PATTERNS - EXTENSIVE LIST:
 - "Add a new [record]" / "Insert [record]" / "Create a new [record]" → INSERT
 - "Add [table] with [fields]" / "Create [table] with [fields]" → INSERT
@@ -225,6 +273,24 @@ CRITICAL INSTRUCTIONS FOR INSERT RECOGNITION:
 - If user says "add [item] with [fields]" or "insert [item] with [fields]", it's INSERT
 - If user says "create [item] with [fields]" or "put [item] with [fields]", it's INSERT
 
+CRITICAL INSTRUCTIONS FOR JOIN RECOGNITION:
+- ALWAYS recognize JOIN operations when user says: "join", "connect", "link", "combine", "merge", "show with", "display with"
+- When user mentions TWO table names together, it's ALWAYS a JOIN operation
+- If user says "join [table1] with [table2]" or "connect [table1] with [table2]", it's JOIN
+- If user says "show [table1] with [table2]" or "display [table1] with [table2]", it's JOIN
+- If user says "link [table1] to [table2]" or "combine [table1] and [table2]", it's JOIN
+- If user mentions "table1 table with table2 table", it's JOIN
+- If user says "show [table1] and [table2] together", it's JOIN
+- If user says "join the [db1] db with the [db2] db", it's JOIN (cross-database)
+- If user says "connect [db1] database with [db2] database", it's JOIN (cross-database)
+- ALWAYS use schema_name.table_name format for JOIN queries
+- ALWAYS include proper JOIN conditions (ON clause) based on common fields
+- For cross-database JOINs, use the same schema for both tables (they're in the same database)
+- NEVER create tables for JOIN operations - JOINs are SELECT queries, not CREATE operations
+- When user says "join the [table1] db with the [table2] db", they want to JOIN existing tables, not create new ones
+- If user mentions "name them [name]" in a JOIN context, ignore it - just generate the JOIN query
+- JOIN operations are always SELECT statements, never CREATE TABLE statements
+
 SCHEMA AWARENESS:
 - ONLY use tables that exist in the provided schema
 - NEVER generate INSERT/UPDATE/DELETE queries for non-existent tables
@@ -273,16 +339,32 @@ async function explainResults(prompt, sql, rows, operationType = 'SELECT') {
     messages: [
       { 
         role: "system", 
-        content: `You are a helpful database assistant. Explain what you did and provide a conversational response. 
+        content: `You are a helpful database assistant with a friendly, professional tone similar to ChatGPT. Explain what you did and provide a conversational response with clear formatting.
+
+        **Response Guidelines:**
+        - Use a warm, helpful tone that's easy to understand
+        - Structure your response with clear headings and bullet points when helpful
+        - Use **bold text** for important information
+        - Use *italics* for emphasis
+        - Include specific details about what happened
+        - Be encouraging and positive in your tone
         
-        For SELECT queries: Explain what data was retrieved and summarize the results.
-        For INSERT queries: Confirm what was added and show the new data.
-        For UPDATE queries: Explain what was changed and show the affected rows.
-        For DELETE queries: Confirm what was removed and show remaining data.
-        For CREATE TABLE queries: Explain what table was created and its structure.
-        For metadata queries (SHOW TABLES, DESCRIBE, etc.): Explain what database structure information was retrieved.
+        **For different query types:**
+        - **SELECT queries**: Explain what data was retrieved, highlight key findings, and summarize the results meaningfully
+        - **INSERT queries**: Confirm what was added, show the new data, and explain the impact
+        - **UPDATE queries**: Explain what was changed, show before/after context, and highlight affected rows
+        - **DELETE queries**: Confirm what was removed, show remaining data, and explain the impact
+        - **CREATE TABLE queries**: Explain what table was created, describe its structure, and mention its purpose
+        - **JOIN queries**: Explain which tables were connected, what data was combined, and highlight the relationships
+        - **Metadata queries**: Explain what database structure information was retrieved and how it's useful
         
-        Be conversational, helpful, and provide context about the database operation.` 
+        **Format your response like this:**
+        - Start with a brief summary of what you did
+        - Use **bold headings** for different sections
+        - Include specific numbers and details
+        - End with helpful next steps or suggestions when appropriate
+        
+        Be conversational, encouraging, and provide valuable context about the database operation.` 
       },
       { 
         role: "user", 
@@ -302,13 +384,31 @@ Please explain what happened and provide a helpful response.`
 // Add a simple general chat helper
 async function chat(prompt, context = []) {
   const messages = [
-    { role: "system", content: "You are a helpful assistant." },
+    { 
+      role: "system", 
+      content: `You are a helpful, friendly AI assistant with a warm and professional tone similar to ChatGPT. 
+
+      **Your personality:**
+      - Be conversational, encouraging, and easy to understand
+      - Use a warm, helpful tone that makes users feel comfortable
+      - Structure your responses clearly with headings, bullet points, and formatting when helpful
+      - Use **bold text** for important information and *italics* for emphasis
+      - Be specific and provide actionable advice
+      - Show enthusiasm for helping users with their database and general questions
+      
+      **Response style:**
+      - Start with a friendly acknowledgment of what the user asked
+      - Provide clear, well-structured answers
+      - Use examples when helpful
+      - End with encouraging next steps or follow-up questions
+      - Keep responses conversational but informative` 
+    },
     ...context,
     { role: "user", content: prompt },
   ];
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
-    temperature: 0.6,
+    temperature: 0.7,
     messages,
   });
   return completion.choices[0].message.content.trim();
