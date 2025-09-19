@@ -1,5 +1,8 @@
 const mysql = require("mysql2/promise");
 const sqlite3 = require("sqlite3").verbose();
+const path = require("path");              // ADD
+const fs = require("fs/promises");         // ADD
+
 
 // MySQL connection config
 const MYSQL_HOST = process.env.MYSQL_HOST || "localhost";
@@ -7,6 +10,7 @@ const MYSQL_PORT = Number(process.env.MYSQL_PORT || 3306);
 const MYSQL_USER = process.env.MYSQL_USER || "root";
 const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD ?? process.env.MYSQL_PASS ?? "";
 const MYSQL_DATABASE = process.env.MYSQL_DATABASE ?? process.env.MYSQL_DB ?? "query";
+const USER_DB_BASE = path.join(process.cwd(), "uploads");
 
 let pool;
 
@@ -35,6 +39,68 @@ async function initializeMySQL() {
     console.error("❌ MySQL connection failed:", error.message);
     return false;
   }
+}
+
+async function fileExists(p) {
+  try { await fs.access(p); return true; } catch { return false; }
+}
+
+function sanitize(name) {
+  return String(name || "").replace(/[<>:"/\\|?*\x00-\x1F]/g, "_");
+}
+
+// Resolve the on-disk path of the original .db we saved at upload time
+async function getDatabaseFilePath(uid, dbMeta) {
+  const base = path.join(USER_DB_BASE, String(uid));
+  const fname = sanitize(dbMeta.filename || "");
+  const byId = path.join(base, `${dbMeta.id}.db`);
+  const byName = path.join(base, fname);
+  const byNameDb = path.join(base, fname.endsWith(".db") ? fname : `${fname}.db`);
+
+  console.log("[getDatabaseFilePath] uid:", uid, "dbMeta:", dbMeta);
+  console.log("[getDatabaseFilePath] base:", base);
+  console.log("[getDatabaseFilePath] fname:", fname);
+  console.log("[getDatabaseFilePath] byId:", byId);
+  console.log("[getDatabaseFilePath] byName:", byName);
+  console.log("[getDatabaseFilePath] byNameDb:", byNameDb);
+
+  const candidates = [byId, byName, byNameDb];
+
+  for (const p of candidates) {
+    console.log("[getDatabaseFilePath] checking candidate:", p);
+    if (await fileExists(p)) {
+      console.log("[getDatabaseFilePath] found file at:", p);
+      return p;
+    }
+  }
+
+  // Last resort: scan dir and try to match id/filename
+  try {
+    console.log("[getDatabaseFilePath] scanning directory:", base);
+    const entries = await fs.readdir(base);
+    console.log("[getDatabaseFilePath] directory entries:", entries);
+    
+    for (const e of entries) {
+      console.log("[getDatabaseFilePath] checking entry:", e);
+      if (
+        e === `${dbMeta.id}.db` ||
+        e === fname ||
+        e === (fname.endsWith(".db") ? fname : `${fname}.db`)
+      ) {
+        const p = path.join(base, e);
+        console.log("[getDatabaseFilePath] potential match:", p);
+        if (await fileExists(p)) {
+          console.log("[getDatabaseFilePath] found file via scanning:", p);
+          return p;
+        }
+      }
+    }
+  } catch (err) {
+    console.log("[getDatabaseFilePath] directory scan error:", err.message);
+  }
+
+  console.log("[getDatabaseFilePath] no file found");
+  return null;
 }
 
 // Lightweight availability check for controllers to preflight without throwing
@@ -760,5 +826,6 @@ module.exports = {
   tableExistsInDatabase,
   syncDatabaseTables,
   cleanupOrphanedDatabases,
+  getDatabaseFilePath,
   get pool() { return pool; }
 };
