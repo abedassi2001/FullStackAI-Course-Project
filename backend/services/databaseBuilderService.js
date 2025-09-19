@@ -214,6 +214,8 @@ function generateSQLFromSchema(schema) {
 // Create SQLite database file
 async function createSQLiteDatabase(schema, userId) {
   const dbPath = path.join(__dirname, '..', 'uploads', `db_${userId}_${Date.now()}.db`);
+  const dir = path.dirname(dbPath);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   
   return new Promise((resolve, reject) => {
     const db = new sqlite3.Database(dbPath);

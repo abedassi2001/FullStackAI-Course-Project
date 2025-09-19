@@ -6,9 +6,13 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 function detectIntentFast(message) {
   const msg = message.toLowerCase();
   
-  // Database query keywords
+  // Database query keywords - enhanced for INSERT recognition
   const queryKeywords = ['show', 'get', 'find', 'select', 'insert', 'update', 'delete', 'add', 'change', 'remove', 'all table', 'table names', 'list tables'];
+  const insertKeywords = ['insert', 'add', 'create', 'put', 'insert into', 'add to', 'put in', 'add data', 'insert data', 'create data', 'put data', 'add new', 'insert new', 'create new', 'put new', 'add item', 'insert item', 'create item', 'put item'];
+  const joinKeywords = ['join', 'connect', 'link', 'combine', 'merge', 'show with', 'display with', 'together', 'with their', 'and their', 'table with', 'table to', 'db with', 'database with', 'join the', 'connect the', 'link the'];
   const hasQueryKeywords = queryKeywords.some(keyword => msg.includes(keyword));
+  const hasInsertKeywords = insertKeywords.some(keyword => msg.includes(keyword));
+  const hasJoinKeywords = joinKeywords.some(keyword => msg.includes(keyword));
   
   // Create keywords
   const createKeywords = ['create', 'make', 'build', 'new table', 'new database', 'new schema', 'random db', 'random database', 'random schema', 'random scheme', 'table called', 'table named'];
@@ -58,6 +62,26 @@ function detectIntentFast(message) {
     };
   }
   
+  // Check for INSERT operations first (highest priority)
+  if (hasInsertKeywords) {
+    return {
+      intent: 'database_query',
+      confidence: 0.95,
+      reasoning: 'Contains INSERT operation keywords',
+      requiresDatabase: true
+    };
+  }
+  
+  // Check for JOIN operations (high priority)
+  if (hasJoinKeywords) {
+    return {
+      intent: 'database_query',
+      confidence: 0.9,
+      reasoning: 'Contains JOIN operation keywords',
+      requiresDatabase: true
+    };
+  }
+  
   if (hasQueryKeywords) {
     return {
       intent: 'database_query',
@@ -102,8 +126,28 @@ RULES:
 - "create random db/database/schema" → create_random_database
 - "create database/schema for [description]" → create_schema  
 - "create [table]" → create_table
+- "insert/add/put data into [table]" → database_query (INSERT operation)
+- "add [item] to [table]" → database_query (INSERT operation)
+- "insert [item] into [table]" → database_query (INSERT operation)
+- "create [item] in [table]" → database_query (INSERT operation)
+- "put [item] in [table]" → database_query (INSERT operation)
+- "add new [item]" → database_query (INSERT operation)
+- "insert new [item]" → database_query (INSERT operation)
+- "create new [item]" → database_query (INSERT operation)
+- "put new [item]" → database_query (INSERT operation)
+- "join [table1] with [table2]" → database_query (JOIN operation)
+- "connect [table1] with [table2]" → database_query (JOIN operation)
+- "link [table1] with [table2]" → database_query (JOIN operation)
+- "combine [table1] and [table2]" → database_query (JOIN operation)
+- "show [table1] with [table2]" → database_query (JOIN operation)
+- "display [table1] with [table2]" → database_query (JOIN operation)
+- "join the [db1] db with the [db2] db" → database_query (JOIN operation)
+- "connect [db1] database with [db2] database" → database_query (JOIN operation)
+- "link [db1] with [db2]" → database_query (JOIN operation)
 - "show/get/find [data]" → database_query
-- General conversation → general_chat`
+- General conversation → general_chat
+
+IMPORTANT: Any mention of adding, inserting, creating, or putting data/items into an existing table should be classified as database_query (INSERT operation). Any mention of joining, connecting, linking, or combining two tables should be classified as database_query (JOIN operation).`
       },
       { role: "user", content: message },
     ],

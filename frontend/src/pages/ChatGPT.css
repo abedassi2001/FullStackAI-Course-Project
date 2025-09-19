@@ -251,31 +251,193 @@
   opacity: 0.6;
 }
 
-/* ChatGPT Explanation Block Styling */
+/* ChatGPT Explanation Block Styling - Enhanced for Better Readability */
 .chat-explanation-block {
-  margin-top: 16px;
-  background-color: var(--accent-color);
-  border-radius: 12px;
-  border-left: 4px solid var(--primary-color);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-top: 20px;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(59, 130, 246, 0.08) 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.15),
+    0 2px 8px rgba(139, 92, 246, 0.1);
   overflow: hidden;
+  backdrop-filter: blur(10px);
 }
 
 .chat-explanation-header {
-  background: var(--gradient-surface);
-  padding: 12px 16px;
-  font-weight: 600;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(59, 130, 246, 0.15) 100%);
+  padding: 16px 20px;
+  font-weight: 700;
   color: var(--text-primary);
-  border-bottom: 1px solid var(--border-color);
-  font-size: 14px;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.3);
+  font-size: 16px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
 }
 
 .chat-explanation-text {
-  padding: 16px 20px;
-  color: var(--text-primary);
-  line-height: 1.7;
+  padding: 24px 28px !important;
+  color: var(--text-primary) !important;
+  line-height: 1.8 !important;
+  font-size: 18px !important;
+  font-weight: 400 !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif !important;
+  letter-spacing: 0.3px !important;
+  text-rendering: optimizeLegibility !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+}
+
+/* Enhanced text formatting for better ChatGPT-like appearance */
+.chat-explanation-text p {
+  margin: 0 0 16px 0 !important;
+  font-size: 18px !important;
+  line-height: 1.8 !important;
+}
+
+.chat-explanation-text p:last-child {
+  margin-bottom: 0 !important;
+}
+
+.chat-explanation-text strong {
+  font-weight: 700;
+  color: #e0e7ff;
+  background: linear-gradient(135deg, #8b5cf6, #3b82f6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.chat-explanation-text em {
+  font-style: italic;
+  color: #a5b4fc;
+  font-weight: 500;
+}
+
+.chat-explanation-text code {
+  background: rgba(139, 92, 246, 0.15);
+  color: #e0e7ff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   font-size: 16px;
-  font-weight: 400;
+  font-weight: 500;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.chat-explanation-text ul,
+.chat-explanation-text ol {
+  margin: 16px 0;
+  padding-left: 24px;
+}
+
+.chat-explanation-text li {
+  margin: 8px 0 !important;
+  font-size: 18px !important;
+  line-height: 1.7 !important;
+}
+
+.chat-explanation-text h1,
+.chat-explanation-text h2,
+.chat-explanation-text h3,
+.chat-explanation-text h4,
+.chat-explanation-text h5,
+.chat-explanation-text h6 {
+  margin: 20px 0 12px 0;
+  font-weight: 700;
+  color: #e0e7ff;
+  line-height: 1.4;
+}
+
+.chat-explanation-text h1 { font-size: 24px; }
+.chat-explanation-text h2 { font-size: 22px; }
+.chat-explanation-text h3 { font-size: 20px; }
+.chat-explanation-text h4 { font-size: 19px; }
+.chat-explanation-text h5 { font-size: 18px; }
+.chat-explanation-text h6 { font-size: 17px; }
+
+/* Additional ChatGPT-like enhancements */
+.chat-explanation-text blockquote {
+  border-left: 4px solid var(--primary-color);
+  padding-left: 16px;
+  margin: 16px 0;
+  font-style: italic;
+  color: #a5b4fc;
+  background: rgba(139, 92, 246, 0.05);
+  padding: 12px 16px;
+  border-radius: 8px;
+}
+
+.chat-explanation-text hr {
+  border: none;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
+  margin: 24px 0;
+}
+
+.chat-explanation-text table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  background: rgba(139, 92, 246, 0.05);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.chat-explanation-text th,
+.chat-explanation-text td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+.chat-explanation-text th {
+  background: rgba(139, 92, 246, 0.1);
+  font-weight: 700;
+  color: #e0e7ff;
+}
+
+.chat-explanation-text td {
+  color: var(--text-primary);
+}
+
+/* Smooth animations for better UX */
+.chat-explanation-block {
+  transition: all 0.3s ease;
+  animation: fadeInUp 0.4s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive design for mobile */
+@media (max-width: 768px) {
+  .chat-explanation-text {
+    padding: 20px 16px;
+    font-size: 16px;
+  }
+  
+  .chat-explanation-text p {
+    font-size: 16px;
+  }
+  
+  .chat-explanation-text li {
+    font-size: 16px;
+  }
+  
+  .chat-explanation-header {
+    padding: 12px 16px;
+    font-size: 14px;
+  }
 }
 
 /* Database Selector */
@@ -1055,10 +1217,6 @@
   font-size: 14px;
 }
 
-.chat-explanation-text {
-  font-size: 14px;
-  line-height: 1.5;
-}
 
 .table-dropped-block {
   background-color: var(--surface-color);

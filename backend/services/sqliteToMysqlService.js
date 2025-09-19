@@ -1,5 +1,8 @@
 const mysql = require("mysql2/promise");
 const sqlite3 = require("sqlite3").verbose();
+const path = require("path");              // ADD
+const fs = require("fs/promises");         // ADD
+
 
 // MySQL connection config
 const MYSQL_HOST = process.env.MYSQL_HOST || "localhost";
@@ -7,6 +10,7 @@ const MYSQL_PORT = Number(process.env.MYSQL_PORT || 3306);
 const MYSQL_USER = process.env.MYSQL_USER || "root";
 const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD ?? process.env.MYSQL_PASS ?? "";
 const MYSQL_DATABASE = process.env.MYSQL_DATABASE ?? process.env.MYSQL_DB ?? "query";
+const USER_DB_BASE = path.join(process.cwd(), "uploads");
 
 let pool;
 
@@ -35,6 +39,68 @@ async function initializeMySQL() {
     console.error("❌ MySQL connection failed:", error.message);
     return false;
   }
+}
+
+async function fileExists(p) {
+  try { await fs.access(p); return true; } catch { return false; }
+}
+
+function sanitize(name) {
+  return String(name || "").replace(/[<>:"/\\|?*\x00-\x1F]/g, "_");
+}
+
+// Resolve the on-disk path of the original .db we saved at upload time
+async function getDatabaseFilePath(uid, dbMeta) {
+  const base = path.join(USER_DB_BASE, String(uid));
+  const fname = sanitize(dbMeta.filename || "");
+  const byId = path.join(base, `${dbMeta.id}.db`);
+  const byName = path.join(base, fname);
+  const byNameDb = path.join(base, fname.endsWith(".db") ? fname : `${fname}.db`);
+
+  console.log("[getDatabaseFilePath] uid:", uid, "dbMeta:", dbMeta);
+  console.log("[getDatabaseFilePath] base:", base);
+  console.log("[getDatabaseFilePath] fname:", fname);
+  console.log("[getDatabaseFilePath] byId:", byId);
+  console.log("[getDatabaseFilePath] byName:", byName);
+  console.log("[getDatabaseFilePath] byNameDb:", byNameDb);
+
+  const candidates = [byId, byName, byNameDb];
+
+  for (const p of candidates) {
+    console.log("[getDatabaseFilePath] checking candidate:", p);
+    if (await fileExists(p)) {
+      console.log("[getDatabaseFilePath] found file at:", p);
+      return p;
+    }
+  }
+
+  // Last resort: scan dir and try to match id/filename
+  try {
+    console.log("[getDatabaseFilePath] scanning directory:", base);
+    const entries = await fs.readdir(base);
+    console.log("[getDatabaseFilePath] directory entries:", entries);
+    
+    for (const e of entries) {
+      console.log("[getDatabaseFilePath] checking entry:", e);
+      if (
+        e === `${dbMeta.id}.db` ||
+        e === fname ||
+        e === (fname.endsWith(".db") ? fname : `${fname}.db`)
+      ) {
+        const p = path.join(base, e);
+        console.log("[getDatabaseFilePath] potential match:", p);
+        if (await fileExists(p)) {
+          console.log("[getDatabaseFilePath] found file via scanning:", p);
+          return p;
+        }
+      }
+    }
+  } catch (err) {
+    console.log("[getDatabaseFilePath] directory scan error:", err.message);
+  }
+
+  console.log("[getDatabaseFilePath] no file found");
+  return null;
 }
 
 // Lightweight availability check for controllers to preflight without throwing
@@ -581,29 +647,34 @@ async function executeQueryOnUserDb(dbId, userId, query) {
   }
 }
 
-// Get list of user's databases
+// Get list of user's databases (with real table/row counts)
 async function listUserDatabases(userId) {
   await ensureSchema();
   
   const [rows] = await pool.execute(
-    `SELECT d.id, d.filename, d.mysql_schema_name, d.created_at
+    `SELECT 
+       d.id,
+       d.filename,
+       d.mysql_schema_name,
+       d.created_at,
+       COUNT(t.table_name) AS tableCount,
+       COALESCE(SUM(t.row_count), 0) AS totalRows
      FROM user_databases d
+     LEFT JOIN database_tables t ON d.id = t.db_id
      WHERE d.user_id = ?
+     GROUP BY d.id, d.filename, d.mysql_schema_name, d.created_at
      ORDER BY d.created_at DESC`,
     [String(userId)]
   );
   
-  // Fast version - just return basic info without expensive checks
-  const validDatabases = rows.map(row => ({
+  return rows.map(row => ({
     id: row.id,
-    filename: row.filename, // This should be the original filename
-    mysqlSchemaName: row.mysql_schema_name, // This is the MySQL schema name
-    tableCount: 0, // Will be updated when needed
-    totalRows: 0,  // Will be updated when needed
+    filename: row.filename,
+    mysqlSchemaName: row.mysql_schema_name,
+    tableCount: Number(row.tableCount) || 0,
+    totalRows: Number(row.totalRows) || 0,
     created_at: row.created_at
   }));
-  
-  return validDatabases;
 }
 
 // Clean up orphaned database entries (databases that no longer exist in MySQL)
@@ -755,5 +826,6 @@ module.exports = {
   tableExistsInDatabase,
   syncDatabaseTables,
   cleanupOrphanedDatabases,
+  getDatabaseFilePath,
   get pool() { return pool; }
 };
