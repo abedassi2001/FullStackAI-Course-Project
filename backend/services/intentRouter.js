@@ -14,8 +14,8 @@ function detectIntentFast(message) {
   const hasInsertKeywords = insertKeywords.some(keyword => msg.includes(keyword));
   const hasJoinKeywords = joinKeywords.some(keyword => msg.includes(keyword));
   
-  // Create keywords
-  const createKeywords = ['create', 'make', 'build', 'new table', 'new database', 'new schema', 'random db', 'random database', 'random schema', 'random scheme', 'table called', 'table named'];
+  // Create keywords (removed table creation keywords)
+  const createKeywords = ['create', 'make', 'build', 'new database', 'new schema', 'random db', 'random database', 'random schema', 'random scheme'];
   const hasCreateKeywords = createKeywords.some(keyword => msg.includes(keyword));
   
   // General chat indicators
@@ -33,15 +33,6 @@ function detectIntentFast(message) {
       };
     }
     
-    // Check for table creation specifically
-    if (msg.includes('table') || msg.includes('table called') || msg.includes('table named')) {
-      return {
-        intent: 'create_table',
-        confidence: 0.95,
-        reasoning: 'Contains table creation keywords',
-        requiresDatabase: false
-      };
-    }
     
     // Check for specific database/schema creation with details
     if (msg.includes('database') || msg.includes('schema') || msg.includes('db')) {
@@ -120,12 +111,11 @@ async function detectIntentAI(message, hasDatabase = false) {
     messages: [
       {
         role: "system",
-        content: `Classify intent. Return JSON: {"intent": "general_chat|database_query|create_schema|create_table|create_random_database", "confidence": 0.0-1.0, "requiresDatabase": true/false}
+        content: `Classify intent. Return JSON: {"intent": "general_chat|database_query|create_schema|create_random_database", "confidence": 0.0-1.0, "requiresDatabase": true/false}
 
 RULES:
 - "create random db/database/schema" → create_random_database
 - "create database/schema for [description]" → create_schema  
-- "create [table]" → create_table
 - "insert/add/put data into [table]" → database_query (INSERT operation)
 - "add [item] to [table]" → database_query (INSERT operation)
 - "insert [item] into [table]" → database_query (INSERT operation)

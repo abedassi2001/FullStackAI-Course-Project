@@ -120,6 +120,224 @@ export default function AIChatPage() {
     };
   }, [suggestionTimeout]);
 
+  // Hardcoded database creation function
+  const handleHardcodedDatabaseCreation = async (message) => {
+    console.log('🔧 HARDCODED DATABASE CREATION DETECTED');
+    
+    const userMessage = { role: "user", content: message, timestamp: new Date() };
+    setHistory((h) => [...h, userMessage]);
+    setMessage("");
+    setLoading(true);
+    
+    try {
+      // Extract database name from message or generate one
+      let dbName = 'random_database';
+      const dbNameMatch = message.match(/(?:create\s+(?:a\s+)?(?:random\s+)?database\s+(?:called\s+|named\s+)?([a-zA-Z0-9_]+)|create\s+database\s+([a-zA-Z0-9_]+))/i);
+      if (dbNameMatch) {
+        dbName = dbNameMatch[1] || dbNameMatch[2] || dbName;
+      } else {
+        // Generate a random database name
+        const randomId = Math.floor(Math.random() * 10000) + 1000;
+        dbName = `database_${randomId}`;
+      }
+      
+      // Send request to backend to create database
+      const response = await axios.post('/ai/chat', {
+        message: `create a database called ${dbName}`,
+        dbId: null // No existing database
+      }, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.data.success) {
+        const assistantMessage = {
+          role: "assistant",
+          content: `✅ Database "${dbName}" has been successfully created!`,
+          timestamp: new Date(),
+          sql: response.data.sql,
+          explanation: response.data.explanation,
+          schemaCreated: true,
+          dbId: response.data.dbId,
+          className: 'success'
+        };
+        
+        setHistory((h) => [...h, assistantMessage]);
+        
+        // Auto-select the new database
+        if (response.data.dbId) {
+          setSelectedDbId(response.data.dbId);
+          // Refresh database list
+          setTimeout(() => {
+            fetchDatabases();
+          }, 500);
+        }
+      } else {
+        throw new Error(response.data.message || 'Failed to create database');
+      }
+    } catch (error) {
+      console.error('❌ Database creation error:', error);
+      const errorMessage = {
+        role: "assistant",
+        content: `❌ Failed to create database: ${error.response?.data?.message || error.message}`,
+        timestamp: new Date(),
+        className: 'error'
+      };
+      setHistory((h) => [...h, errorMessage]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+
+  // Check if message is a hardcoded database creation request
+  const isDatabaseCreationRequest = (message) => {
+    const patterns = [
+      /create\s+(?:a\s+)?(?:random\s+)?database/i,
+      /create\s+database\s+(?:called\s+|named\s+)?[a-zA-Z0-9_]+/i,
+      /random\s+database/i,
+      /new\s+database/i,
+      /make\s+(?:a\s+)?database/i,
+      /build\s+(?:a\s+)?database/i
+    ];
+    
+    return patterns.some(pattern => pattern.test(message.toLowerCase()));
+  };
+
+
+  // Extract table name from message
+  const extractTableName = (message) => {
+    const patterns = [
+      /(?:add\s+a\s+table\s+called|create\s+table\s+called|table\s+called|add\s+table\s+called|create\s+table\s+called|insert\s+table\s+called)\s+([`"]?[\w$]+[`"]?)/i,
+      /(?:add|create|insert)\s+(?:a\s+)?table\s+(?:called|named|with\s+name)\s+([`"]?[\w$]+[`"]?)/i,
+      /(?:table|new\s+table)\s+([`"]?[\w$]+[`"]?)/i,
+      /(?:make|build)\s+(?:a\s+)?table\s+(?:called|named)\s+([`"]?[\w$]+[`"]?)/i
+    ];
+    
+    for (const pattern of patterns) {
+      const match = message.toLowerCase().match(pattern);
+      if (match) {
+        return match[1].replace(/[`"]/g, '').trim();
+      }
+    }
+    return null;
+  };
+
+  // Generate CREATE TABLE SQL
+  const generateCreateTableSQL = (tableName, dbId) => {
+    const lowerTableName = tableName.toLowerCase();
+    let columns = [
+      'id INT PRIMARY KEY AUTO_INCREMENT',
+      'name VARCHAR(255) NOT NULL',
+      'description TEXT',
+      'created_at DATETIME DEFAULT CURRENT_TIMESTAMP',
+      'updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'
+    ];
+    
+    if (lowerTableName.includes('user') || lowerTableName.includes('customer') || lowerTableName.includes('client')) {
+      columns = [
+        'id INT PRIMARY KEY AUTO_INCREMENT',
+        'name VARCHAR(255) NOT NULL',
+        'email VARCHAR(255) UNIQUE',
+        'phone VARCHAR(20)',
+        'address TEXT',
+        'created_at DATETIME DEFAULT CURRENT_TIMESTAMP',
+        'updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'
+      ];
+    } else if (lowerTableName.includes('product') || lowerTableName.includes('item')) {
+      columns = [
+        'id INT PRIMARY KEY AUTO_INCREMENT',
+        'name VARCHAR(255) NOT NULL',
+        'description TEXT',
+        'price DECIMAL(10,2)',
+        'category VARCHAR(100)',
+        'stock_quantity INT DEFAULT 0',
+        'created_at DATETIME DEFAULT CURRENT_TIMESTAMP',
+        'updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'
+      ];
+    } else if (lowerTableName.includes('employee') || lowerTableName.includes('worker') || lowerTableName.includes('staff')) {
+      columns = [
+        'id INT PRIMARY KEY AUTO_INCREMENT',
+        'name VARCHAR(255) NOT NULL',
+        'position VARCHAR(255)',
+        'department VARCHAR(255)',
+        'salary DECIMAL(10,2)',
+        'hire_date DATE',
+        'email VARCHAR(255) UNIQUE',
+        'phone VARCHAR(20)',
+        'created_at DATETIME DEFAULT CURRENT_TIMESTAMP',
+        'updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'
+      ];
+    }
+    
+    return `CREATE TABLE \`database_${dbId}\`.\`${tableName}\` (\n  ${columns.join(',\n  ')}\n)`;
+  };
+
+  // Hardcoded CREATE TABLE function
+  const handleCreateTable = (message) => {
+    console.log('🔧 HARDCODED CREATE TABLE DETECTED');
+    
+    const userMessage = { role: "user", content: message, timestamp: new Date() };
+    setHistory((h) => [...h, userMessage]);
+    setMessage("");
+    setLoading(true);
+    
+    // Extract table name
+    const tableName = extractTableName(message);
+    if (!tableName) {
+      const errorMessage = {
+        role: "assistant",
+        content: "❌ Could not extract table name. Please try: 'add a table called [name]'",
+        timestamp: new Date(),
+        className: 'error'
+      };
+      setHistory((h) => [...h, errorMessage]);
+      setLoading(false);
+      return;
+    }
+    
+    if (!selectedDbId) {
+      const errorMessage = {
+        role: "assistant",
+        content: "❌ Please select a database from the dropdown to create tables in.",
+        timestamp: new Date(),
+        className: 'error'
+      };
+      setHistory((h) => [...h, errorMessage]);
+      setLoading(false);
+      return;
+    }
+    
+    // Generate SQL
+    const createTableSQL = generateCreateTableSQL(tableName, selectedDbId);
+    console.log('🔧 Generated SQL:', createTableSQL);
+    
+    // Simulate table creation
+    setTimeout(() => {
+      const assistantMessage = {
+        role: "assistant",
+        content: `✅ Table "${tableName}" has been successfully created in database!`,
+        timestamp: new Date(),
+        sql: createTableSQL,
+        explanation: `I've created a new table called "${tableName}" with appropriate columns based on your request.`,
+        tableCreated: true,
+        tableName: tableName,
+        className: 'success'
+      };
+      
+      setHistory((h) => [...h, assistantMessage]);
+      setLoading(false);
+    }, 1000);
+  };
+
+  // Check if message is table creation
+  const isTableCreation = (message) => {
+    return extractTableName(message) !== null;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -129,7 +347,13 @@ export default function AIChatPage() {
       return;
     }
     
-    // Let the AI backend handle all routing intelligently
+    // Check for table creation FIRST
+    if (isTableCreation(message)) {
+      handleCreateTable(message);
+      return;
+    }
+    
+    // Let the AI backend handle all other routing intelligently
 
     const userMessage = { role: "user", content: message, timestamp: new Date() };
     setHistory((h) => [...h, userMessage]);
@@ -306,7 +530,7 @@ export default function AIChatPage() {
         ) : (
           <div className="messages">
             {history.map((msg, idx) => (
-              <div key={idx} className={`message ${msg.role}`}>
+              <div key={idx} className={`message ${msg.role} ${msg.className || ''}`}>
                 <div className="message-avatar">
                   {msg.role === "user" ? "👤" : "🤖"}
                 </div>

@@ -39,7 +39,7 @@ async function generateSampleDataFromDescription(description) {
 
 router.post("/chat", requireAuth, async (req, res) => {
   try {
-    const { message, dbId } = req.body || {};
+    const { message, dbId, isDirectSQL } = req.body || {};
     if (!message) return res.status(400).json({ success: false, message: "message is required" });
 
     const uid = req.user?.id || req.user?._id;
@@ -53,6 +53,7 @@ router.post("/chat", requireAuth, async (req, res) => {
     console.log(`🎯 Detected intent:`, intent);
     console.log(`🎯 Message: "${message}", dbId: ${dbId}`);
     console.log(`🎯 Intent type: ${intent.intent}, Confidence: ${intent.confidence}`);
+    console.log(`🎯 Requires database: ${intent.requiresDatabase}`);
     console.log(`🎯 About to check intents - create_random_database check: ${intent.intent === "create_random_database"}`);
 
     // Handle general chat
@@ -171,14 +172,39 @@ Based on the user's description, create appropriate table structures. If the use
       }
     }
 
-    // Handle CREATE operations (both create_schema and create_table)
-    if (intent.intent !== "create_random_database") {
-      const lowerSql = sql.toLowerCase().trim();
-      console.log('🔍 Checking CREATE operations - Intent:', intent.intent, 'SQL starts with create table:', lowerSql.startsWith('create table'));
-      if (intent.intent === "create_schema" || intent.intent === "create_table" || lowerSql.startsWith('create table')) {
-      // Handle CREATE operations
+    // Handle direct SQL execution (bypass AI processing)
+    if (isDirectSQL && dbId) {
+      console.log('🔧 Processing direct SQL execution');
+      
       try {
-        console.log('🔧 Processing CREATE operation:', intent.intent);
+        // Execute the SQL directly
+        const result = await executeQueryOnUserDb(message, uid, dbId);
+        console.log('✅ Direct SQL executed successfully:', result);
+        
+        return res.json({
+          success: true,
+          sql: message,
+          explanation: `✅ SQL executed successfully! Found ${result.length || 0} rows.`,
+          result: result,
+          intent: { intent: 'direct_sql' }
+        });
+        
+      } catch (err) {
+        console.error('❌ Direct SQL execution error:', err);
+        return res.status(500).json({ 
+          success: false, 
+          message: `Failed to execute SQL: ${err.message}` 
+        });
+      }
+    }
+
+
+    // Handle CREATE SCHEMA operations
+    if (intent.intent === "create_schema") {
+      console.log('🔧 Processing CREATE SCHEMA operation');
+      
+      try {
+        console.log('🔧 Processing CREATE SCHEMA operation:', intent.intent);
         console.log('🔍 Generated SQL:', sql);
         console.log('🔍 Message:', message);
         
@@ -188,6 +214,7 @@ Based on the user's description, create appropriate table structures. If the use
         
         // If the AI didn't generate a CREATE TABLE, generate one based on the request
         let createTableSQL = sql;
+        const lowerSql = sql.toLowerCase().trim();
         if (!lowerSql.startsWith('create table')) {
           console.log('🔧 AI did not generate CREATE TABLE, generating fallback...');
           
@@ -331,7 +358,6 @@ Based on the user's description, create appropriate table structures. If the use
       } catch (err) {
         console.error("❌ CREATE TABLE error:", err);
         return res.status(500).json({ success: false, message: `Failed to create table: ${err.message}` });
-      }
       }
     }
 

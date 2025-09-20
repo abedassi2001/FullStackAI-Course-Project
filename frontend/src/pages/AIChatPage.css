@@ -339,6 +339,21 @@
   animation-delay: 0.2s;
 }
 
+.message.success {
+  border-left: 3px solid #4caf50;
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.message.error {
+  border-left: 3px solid #f44336;
+  background: rgba(244, 67, 54, 0.1);
+}
+
+.message.info {
+  border-left: 3px solid #2196f3;
+  background: rgba(33, 150, 243, 0.1);
+}
+
 .message-avatar {
   width: 40px;
   height: 40px;
