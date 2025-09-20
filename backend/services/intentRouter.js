@@ -107,7 +107,7 @@ async function detectIntentAI(message, hasDatabase = false) {
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0.1,
-    max_tokens: 150, // Reduced for speed
+    max_tokens: 50, // Further reduced for speed
     messages: [
       {
         role: "system",

@@ -208,14 +208,30 @@ export default function AIChatPage() {
   };
 
 
-  // Extract table name from message
+  // Extract table name from message (only for CREATE TABLE operations)
   const extractTableName = (message) => {
+    // Only match explicit table creation patterns, not INSERT operations
     const patterns = [
       /(?:add\s+a\s+table\s+called|create\s+table\s+called|table\s+called|add\s+table\s+called|create\s+table\s+called|insert\s+table\s+called)\s+([`"]?[\w$]+[`"]?)/i,
       /(?:add|create|insert)\s+(?:a\s+)?table\s+(?:called|named|with\s+name)\s+([`"]?[\w$]+[`"]?)/i,
       /(?:table|new\s+table)\s+([`"]?[\w$]+[`"]?)/i,
       /(?:make|build)\s+(?:a\s+)?table\s+(?:called|named)\s+([`"]?[\w$]+[`"]?)/i
     ];
+    
+    // Exclude INSERT operations - these should go to backend
+    const insertPatterns = [
+      /add\s+a?\s*[a-zA-Z]+\s+in\s+the\s+[a-zA-Z]+\s+table/i,
+      /add\s+[a-zA-Z]+\s+in\s+[a-zA-Z]+/i,
+      /insert\s+[a-zA-Z]+\s+in\s+[a-zA-Z]+/i,
+      /add\s+[a-zA-Z]+\s+to\s+[a-zA-Z]+/i,
+      /add\s+a?\s*row\s+to\s+the\s+[a-zA-Z]+\s+table/i,
+      /add\s+[a-zA-Z]+\s+to\s+the\s+[a-zA-Z]+\s+table/i
+    ];
+    
+    // If it matches INSERT patterns, don't treat as table creation
+    if (insertPatterns.some(pattern => pattern.test(message.toLowerCase()))) {
+      return null;
+    }
     
     for (const pattern of patterns) {
       const match = message.toLowerCase().match(pattern);
@@ -276,7 +292,7 @@ export default function AIChatPage() {
     return `CREATE TABLE \`database_${dbId}\`.\`${tableName}\` (\n  ${columns.join(',\n  ')}\n)`;
   };
 
-  // Hardcoded CREATE TABLE function
+  // Hardcoded CREATE TABLE function (optimized for speed)
   const handleCreateTable = (message) => {
     console.log('🔧 HARDCODED CREATE TABLE DETECTED');
     
@@ -315,7 +331,7 @@ export default function AIChatPage() {
     const createTableSQL = generateCreateTableSQL(tableName, selectedDbId);
     console.log('🔧 Generated SQL:', createTableSQL);
     
-    // Simulate table creation
+    // Simulate table creation (faster response)
     setTimeout(() => {
       const assistantMessage = {
         role: "assistant",
@@ -330,7 +346,7 @@ export default function AIChatPage() {
       
       setHistory((h) => [...h, assistantMessage]);
       setLoading(false);
-    }, 1000);
+    }, 300); // Reduced from 1000ms to 300ms for faster response
   };
 
   // Check if message is table creation

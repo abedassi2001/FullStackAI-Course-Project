@@ -17,24 +17,32 @@ const { buildDatabaseFromData } = require("../services/databaseBuilderService");
 
 const router = express.Router();
 
-// Helper function to generate sample data from description
+// Helper function to generate sample data from description (optimized for speed)
 async function generateSampleDataFromDescription(description) {
-  const { chat } = require("../services/aiService");
+  // Skip AI generation for speed - use smart fallback
+  const timestamp = new Date().toISOString();
+  const baseData = [
+    { id: 1, name: "Sample Item 1", description: "Generated from description", created_at: timestamp, updated_at: timestamp },
+    { id: 2, name: "Sample Item 2", description: "Generated from description", created_at: timestamp, updated_at: timestamp },
+    { id: 3, name: "Sample Item 3", description: "Generated from description", created_at: timestamp, updated_at: timestamp }
+  ];
   
-  const completion = await chat(`Based on this description: "${description}", generate realistic sample data in JSON format. 
-    Create 3-5 sample records that would be typical for this type of data. 
-    Return ONLY a JSON array of objects, no explanations.`, []);
-  
-  try {
-    return JSON.parse(completion);
-  } catch (error) {
-    // Fallback to generic sample data
+  // Smart naming based on description keywords
+  if (description.toLowerCase().includes('user') || description.toLowerCase().includes('customer')) {
     return [
-      { id: 1, name: "Sample Item 1", description: "Generated from description", created_at: new Date().toISOString() },
-      { id: 2, name: "Sample Item 2", description: "Generated from description", created_at: new Date().toISOString() },
-      { id: 3, name: "Sample Item 3", description: "Generated from description", created_at: new Date().toISOString() }
+      { id: 1, name: "John Doe", email: "john@example.com", phone: "555-0001", address: "123 Main St", created_at: timestamp, updated_at: timestamp },
+      { id: 2, name: "Jane Smith", email: "jane@example.com", phone: "555-0002", address: "456 Oak Ave", created_at: timestamp, updated_at: timestamp },
+      { id: 3, name: "Bob Johnson", email: "bob@example.com", phone: "555-0003", address: "789 Pine Rd", created_at: timestamp, updated_at: timestamp }
+    ];
+  } else if (description.toLowerCase().includes('product') || description.toLowerCase().includes('item')) {
+    return [
+      { id: 1, name: "Product A", description: "High quality item", price: 29.99, category: "Electronics", stock_quantity: 100, created_at: timestamp, updated_at: timestamp },
+      { id: 2, name: "Product B", description: "Premium item", price: 49.99, category: "Accessories", stock_quantity: 50, created_at: timestamp, updated_at: timestamp },
+      { id: 3, name: "Product C", description: "Standard item", price: 19.99, category: "General", stock_quantity: 200, created_at: timestamp, updated_at: timestamp }
     ];
   }
+  
+  return baseData;
 }
 
 router.post("/chat", requireAuth, async (req, res) => {

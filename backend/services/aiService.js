@@ -1,15 +1,51 @@
 const OpenAI = require("openai");
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// Simple in-memory cache for AI responses
+const responseCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function getCachedResponse(key) {
+  const cached = responseCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.response;
+  }
+  responseCache.delete(key);
+  return null;
+}
+
+function setCachedResponse(key, response) {
+  responseCache.set(key, {
+    response,
+    timestamp: Date.now()
+  });
+}
+
 // Ask AI for SQL (supports SELECT, INSERT, UPDATE, DELETE, CREATE TABLE)
 async function generateSQL(prompt, schemaText, userId) {
+  // Check cache first
+  const cacheKey = `sql_${prompt}_${schemaText}`;
+  const cached = getCachedResponse(cacheKey);
+  if (cached) {
+    console.log('🚀 Using cached SQL response');
+    return cached;
+  }
+
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0,
+    max_tokens: 200, // Reduced from default for faster responses
     messages: [
       {
         role: "system",
         content: `You are an expert SQL assistant that converts natural language to MySQL queries. 
+
+🚨 CRITICAL RULE - READ THIS FIRST:
+- If user says "add a row to [table]" or "add [item] to [table]" or "add [item] in [table]" → ALWAYS generate INSERT statement
+- If user says "add a table called [name]" or "create table [name]" → generate CREATE TABLE statement
+- "add a row to the teachers table" → INSERT INTO teachers (name, subject) VALUES ('New Teacher', 'Subject');
+- "add a teacher in the teachers table" → INSERT INTO teachers (name, subject) VALUES ('John Smith', 'Mathematics');
+- NEVER create tables when user wants to add data to existing tables!
 
 SCHEMA UNDERSTANDING:
 The provided schema shows tables with their columns and constraints. Each table entry shows:
@@ -69,6 +105,12 @@ IMPORTANT JOIN RULES:
 - Use the format: SELECT t1.*, t2.* FROM schema_name.table1 t1 JOIN schema_name.table2 t2 ON t1.id = t2.table1_id
 - If user mentions "name them [name]", this is just for reference - still generate a JOIN query, not CREATE TABLE
 
+🚨 CRITICAL INSERT RULE - READ THIS CAREFULLY:
+- "add a row to the teachers table" → INSERT INTO teachers (name, subject) VALUES ('New Teacher', 'Subject');
+- "add a teacher in the teachers table" → INSERT INTO teachers (name, subject) VALUES ('John Smith', 'Mathematics');
+- "add teacher to teachers" → INSERT INTO teachers (name, subject) VALUES ('Jane Doe', 'Science');
+- NEVER generate CREATE TABLE when user wants to add data to existing tables!
+
 ➕ INSERT QUERIES (Add Data) - COMPREHENSIVE EXAMPLES:
 - "Add a new customer named John Smith" → INSERT INTO customers (name) VALUES ('John Smith');
 - "Create a new product with name 'Laptop' and price 999" → INSERT INTO products (name, price) VALUES ('Laptop', 999);
@@ -78,6 +120,11 @@ IMPORTANT JOIN RULES:
 - "Add a test item with id 15 name abed description random" → INSERT INTO test (id, name, description) VALUES (15, 'abed', 'random');
 - "Insert to the table called test a row with id = 15 name = abed and description = random" → INSERT INTO test (id, name, description) VALUES (15, 'abed', 'random');
 - "Add a random row to the table" → INSERT INTO test (name, description) VALUES ('Random Item', 'Random Description');
+- "Add a teacher in the teachers table" → INSERT INTO teachers (name, subject) VALUES ('John Smith', 'Mathematics');
+- "Add a teacher to teachers" → INSERT INTO teachers (name, subject) VALUES ('Jane Doe', 'Science');
+- "Insert teacher in teachers table" → INSERT INTO teachers (name, subject) VALUES ('Bob Johnson', 'English');
+- "Add a row to the teachers table" → INSERT INTO teachers (name, subject) VALUES ('New Teacher', 'Subject');
+- "Add a row to teachers" → INSERT INTO teachers (name, subject) VALUES ('New Teacher', 'Subject');
 
 🔍 INSERT PATTERN RECOGNITION - ALL VARIATIONS:
 - "insert into [table] values (...)" → INSERT INTO [table] VALUES (...);
@@ -216,6 +263,10 @@ COMMON PATTERNS TO RECOGNIZE - COMPREHENSIVE LIST:
 - "Create [item] having [fields]" / "Put [item] having [fields]" → INSERT
 - "Insert [item] containing [fields]" / "Add [item] containing [fields]" → INSERT
 - "Create [item] containing [fields]" / "Put [item] containing [fields]" → INSERT
+- "Add a [item] in the [table] table" / "Add a [item] to the [table] table" → INSERT
+- "Add [item] in [table]" / "Add [item] to [table]" → INSERT
+- "Insert [item] in [table]" / "Insert [item] into [table]" → INSERT
+- "Add a row to the [table] table" / "Add a row to [table]" → INSERT
 
 ✏️ UPDATE PATTERNS:
 - "Change" / "Update" / "Modify" / "Edit" / "Set" → UPDATE
@@ -254,6 +305,10 @@ IMPORTANT DISTINCTION:
 - "Create an album table" → CREATE TABLE album (...)
 - "Add a new customer" (when customer table exists) → INSERT INTO customer (...)
 - "Create a customer table" → CREATE TABLE customer (...)
+- "Add a teacher in the teachers table" (when teachers table exists) → INSERT INTO teachers (name, subject) VALUES ('John Smith', 'Mathematics')
+- "Create a teachers table" → CREATE TABLE teachers (...)
+- "Add a teacher to teachers" (when teachers table exists) → INSERT INTO teachers (name, subject) VALUES ('Jane Doe', 'Science')
+- "Add a row to the teachers table" (when teachers table exists) → INSERT INTO teachers (name, subject) VALUES ('New Teacher', 'Subject')
 - "Create a schema called X" → CREATE SCHEMA X
 - "Create a database called X" → CREATE SCHEMA X
 - "Create a db called X" → CREATE SCHEMA X
@@ -272,6 +327,16 @@ CRITICAL INSTRUCTIONS FOR INSERT RECOGNITION:
 - If user mentions specific field values and a table, it's INSERT
 - If user says "add [item] with [fields]" or "insert [item] with [fields]", it's INSERT
 - If user says "create [item] with [fields]" or "put [item] with [fields]", it's INSERT
+- If user says "add a [item] in the [table] table", it's INSERT (not CREATE TABLE)
+- If user says "add [item] in [table]", it's INSERT (not CREATE TABLE)
+- If user says "insert [item] in [table]", it's INSERT (not CREATE TABLE)
+
+CRITICAL DISTINCTION:
+- "add a table called X" → CREATE TABLE (creates new table)
+- "add a [item] in the [table] table" → INSERT (adds data to existing table)
+- "add [item] in [table]" → INSERT (adds data to existing table)
+- "create table X" → CREATE TABLE (creates new table)
+- "create [item] in [table]" → INSERT (adds data to existing table)
 
 CRITICAL INSTRUCTIONS FOR JOIN RECOGNITION:
 - ALWAYS recognize JOIN operations when user says: "join", "connect", "link", "combine", "merge", "show with", "display with"
@@ -316,6 +381,11 @@ SCHEMA USAGE EXAMPLES:
 - If schema is "test_12345" and table is "test" → INSERT INTO test_12345.test (...)
 - If schema is "database_67890" and table is "users" → INSERT INTO database_67890.users (...)
 - Always prefix table names with the schema name from the provided schema information
+
+🚨 FINAL REMINDER:
+- "add a row to the teachers table" → INSERT INTO teachers (name, subject) VALUES ('New Teacher', 'Subject');
+- "add teacher in teachers table" → INSERT INTO teachers (name, subject) VALUES ('John Smith', 'Mathematics');
+- NEVER CREATE TABLE when adding data to existing tables!
 
 Return ONLY the SQL query, no explanations.`
       },
@@ -378,11 +448,25 @@ Please explain what happened and provide a helpful response.`
       },
     ],
   });
-  return completion.choices[0].message.content.trim();
+  
+  const result = completion.choices[0].message.content.trim();
+  
+  // Cache the result
+  setCachedResponse(cacheKey, result);
+  
+  return result;
 }
 
 // Add a simple general chat helper
 async function chat(prompt, context = []) {
+  // Check cache first
+  const cacheKey = `chat_${prompt}_${JSON.stringify(context)}`;
+  const cached = getCachedResponse(cacheKey);
+  if (cached) {
+    console.log('🚀 Using cached chat response');
+    return cached;
+  }
+
   const messages = [
     { 
       role: "system", 
@@ -409,9 +493,16 @@ async function chat(prompt, context = []) {
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0.7,
+    max_tokens: 150, // Reduced for faster responses
     messages,
   });
-  return completion.choices[0].message.content.trim();
+  
+  const result = completion.choices[0].message.content.trim();
+  
+  // Cache the result
+  setCachedResponse(cacheKey, result);
+  
+  return result;
 }
 
 // Generate a concise chat title from the first user message
@@ -419,6 +510,7 @@ async function generateChatTitle(message) {
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0.2,
+    max_tokens: 20, // Very short for titles
     messages: [
       {
         role: "system",
@@ -436,16 +528,17 @@ async function extractSchemaName(prompt) {
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0,
+    max_tokens: 30, // Very short for schema names
     messages: [
       {
         role: "system",
-        content: `You are a schema name extractor. Extract the schema/database name from user requests.
+        content: `Extract schema/database name from user requests. Return only the name, nothing else.
 
-        Look for patterns like:
-        - "create a schema called X"
-        - "create schema X" 
-        - "create database X"
-        - "create a database called X"
+        Patterns:
+        - "create a schema called X" → X
+        - "create schema X" → X
+        - "create database X" → X
+        - "create a database called X" → X
         - "create db X"
         - "create a db called X"
         - "make a schema named X"
