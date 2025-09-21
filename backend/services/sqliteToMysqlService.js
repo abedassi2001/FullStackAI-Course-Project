@@ -337,21 +337,43 @@ async function convertTableToMySQL(sqliteDb, tableName, mysqlTableName, dbId, sc
   };
 }
 
+// Helper function to check if a schema exists
+async function schemaExists(schemaName) {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?`,
+      [schemaName]
+    );
+    return rows.length > 0;
+  } catch (error) {
+    console.warn(`Error checking if schema exists: ${error.message}`);
+    return false;
+  }
+}
+
 // Main function to convert SQLite database to MySQL
 async function convertSqliteToMysql(userId, filename, sqliteBuffer, customSchemaName = null) {
   await ensureSchema();
   
-  // Create unique schema name for this user's database (shorter name)
+  // Create schema name for this user's database (clean name without timestamp)
   let mysqlSchemaName;
   if (customSchemaName) {
     // Use custom schema name if provided, but sanitize it
     mysqlSchemaName = customSchemaName.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 64); // MySQL schema name limit
   } else {
-    // Generate default name using the original filename
+    // Generate clean name using the original filename (no timestamp)
     const cleanFilename = filename.replace(/\.db$/i, '').replace(/[^a-zA-Z0-9_]/g, '_');
-    const timestamp = Date.now().toString().slice(-8); // Last 8 digits
-    mysqlSchemaName = `${cleanFilename}_${timestamp}`;
+    mysqlSchemaName = cleanFilename;
   }
+  
+  // Handle schema name conflicts by adding a counter if needed
+  let finalSchemaName = mysqlSchemaName;
+  let counter = 1;
+  while (await schemaExists(finalSchemaName)) {
+    finalSchemaName = `${mysqlSchemaName}_${counter}`;
+    counter++;
+  }
+  mysqlSchemaName = finalSchemaName;
   
   // Create the MySQL schema (database)
   await pool.execute(`CREATE DATABASE IF NOT EXISTS \`${mysqlSchemaName}\``);
@@ -677,6 +699,64 @@ async function listUserDatabases(userId) {
   }));
 }
 
+// Migrate existing schemas to clean names (remove timestamps)
+async function migrateSchemaNames(userId = null) {
+  await ensureSchema();
+  
+  try {
+    // Get all databases that have timestamped schema names
+    const whereClause = userId ? 'WHERE d.user_id = ?' : '';
+    const params = userId ? [String(userId)] : [];
+    
+    const [rows] = await pool.execute(
+      `SELECT d.id, d.filename, d.mysql_schema_name, d.user_id
+       FROM user_databases d
+       ${whereClause}
+       ORDER BY d.created_at`,
+      params
+    );
+    
+    console.log(`🔄 Found ${rows.length} databases to check for migration`);
+    
+    for (const row of rows) {
+      const currentSchemaName = row.mysql_schema_name;
+      const filename = row.filename;
+      
+      // Check if schema name has timestamp pattern (ends with _ followed by 8 digits)
+      const timestampPattern = /_(\d{8})$/;
+      if (timestampPattern.test(currentSchemaName)) {
+        // Extract clean name (remove timestamp)
+        const cleanName = currentSchemaName.replace(timestampPattern, '');
+        
+        // Check if clean schema name already exists
+        if (await schemaExists(cleanName)) {
+          console.log(`⚠️  Clean schema name '${cleanName}' already exists, skipping migration for '${currentSchemaName}'`);
+          continue;
+        }
+        
+        // Rename the MySQL schema
+        try {
+          await pool.execute(`RENAME DATABASE \`${currentSchemaName}\` TO \`${cleanName}\``);
+          
+          // Update the database record
+          await pool.execute(
+            `UPDATE user_databases SET mysql_schema_name = ? WHERE id = ?`,
+            [cleanName, row.id]
+          );
+          
+          console.log(`✅ Migrated schema: ${currentSchemaName} → ${cleanName}`);
+        } catch (error) {
+          console.error(`❌ Failed to migrate schema ${currentSchemaName}:`, error.message);
+        }
+      }
+    }
+    
+    console.log('🎉 Schema migration completed');
+  } catch (error) {
+    console.error('❌ Schema migration failed:', error.message);
+  }
+}
+
 // Clean up orphaned database entries (databases that no longer exist in MySQL)
 async function cleanupOrphanedDatabases(userId) {
   await ensureSchema();
@@ -826,6 +906,7 @@ module.exports = {
   tableExistsInDatabase,
   syncDatabaseTables,
   cleanupOrphanedDatabases,
+  migrateSchemaNames,
   getDatabaseFilePath,
   get pool() { return pool; }
 };

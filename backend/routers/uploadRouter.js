@@ -28,4 +28,7 @@ router.delete("/:dbId", requireAuth, ctrl.deleteDatabase);
 // ⬇️ NEW: Email the raw .db file to user (or custom email if provided in body)
 router.post("/email/:dbId", requireAuth, ctrl.emailDatabase);
 
+// Migrate existing schema names to clean names (remove timestamps)
+router.post("/migrate-schemas", requireAuth, ctrl.migrateSchemaNames);
+
 module.exports = router;

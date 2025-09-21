@@ -264,6 +264,24 @@ async function createSQLiteDatabase(schema, userId) {
   });
 }
 
+// Helper function to check if a schema exists
+async function schemaExists(schemaName) {
+  try {
+    const { initializeMySQL } = require('./sqliteToMysqlService');
+    await initializeMySQL();
+    const pool = require('./sqliteToMysqlService').pool;
+    
+    const [rows] = await pool.execute(
+      `SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = ?`,
+      [schemaName]
+    );
+    return rows.length > 0;
+  } catch (error) {
+    console.warn(`Error checking if schema exists: ${error.message}`);
+    return false;
+  }
+}
+
 // Create MySQL database
 async function createMySQLDatabase(schema, userId) {
   if (!await isMySQLAvailable()) {
@@ -274,7 +292,18 @@ async function createMySQLDatabase(schema, userId) {
   await initializeMySQL();
   
   const pool = require('./sqliteToMysqlService').pool;
-  const dbName = `user_${userId}_${schema.databaseName}_${Date.now()}`;
+  
+  // Create clean database name without timestamp
+  let dbName = schema.databaseName.replace(/[^a-zA-Z0-9_]/g, '_');
+  
+  // Handle schema name conflicts by adding a counter if needed
+  let finalDbName = dbName;
+  let counter = 1;
+  while (await schemaExists(finalDbName)) {
+    finalDbName = `${dbName}_${counter}`;
+    counter++;
+  }
+  dbName = finalDbName;
   
   try {
     // Create database

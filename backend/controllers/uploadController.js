@@ -112,6 +112,25 @@ exports.schemaPreview = async (req, res) => {
   }
 };
 
+// Migrate existing schemas to clean names (remove timestamps)
+exports.migrateSchemaNames = async (req, res) => {
+  try {
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ success: false, error: "Unauthorized" });
+
+    const { migrateSchemaNames } = require('../services/sqliteToMysqlService');
+    await migrateSchemaNames(uid);
+
+    res.json({ 
+      success: true, 
+      message: "Schema names migrated successfully. Dropdown names should now match schema names." 
+    });
+  } catch (err) {
+    console.error("Migration error:", err);
+    res.status(500).json({ success: false, error: "Failed to migrate schema names" });
+  }
+};
+
 // Create a small demo SQLite DB and convert it to MySQL
 exports.createDemoDB = async (req, res) => {
   try {
