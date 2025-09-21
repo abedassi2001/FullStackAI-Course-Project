@@ -21,14 +21,25 @@ function setCachedResponse(key, response) {
   });
 }
 
+function clearCache() {
+  responseCache.clear();
+  console.log('🧹 AI response cache cleared');
+}
+
 // Ask AI for SQL (supports SELECT, INSERT, UPDATE, DELETE, CREATE TABLE)
 async function generateSQL(prompt, schemaText, userId) {
-  // Check cache first
+  // Check cache first - but skip cache for DELETE operations to ensure fresh responses
   const cacheKey = `sql_${prompt}_${schemaText}`;
-  const cached = getCachedResponse(cacheKey);
-  if (cached) {
-    console.log('🚀 Using cached SQL response');
-    return cached;
+  const isDeleteOperation = prompt.toLowerCase().includes('delete') || prompt.toLowerCase().includes('remove');
+  
+  if (!isDeleteOperation) {
+    const cached = getCachedResponse(cacheKey);
+    if (cached) {
+      console.log('🚀 Using cached SQL response');
+      return cached;
+    }
+  } else {
+    console.log('🗑️ Skipping cache for DELETE operation to ensure fresh response');
   }
 
   const completion = await openai.chat.completions.create({
@@ -40,15 +51,30 @@ async function generateSQL(prompt, schemaText, userId) {
         role: "system",
         content: `You are an expert SQL assistant that converts natural language to MySQL queries. 
 
+🚨🚨🚨 DELETE STATEMENTS MUST ALWAYS USE "DELETE FROM" - NEVER "DELETE" WITHOUT "FROM"! 🚨🚨🚨
+
 🚨 CRITICAL RULE - READ THIS FIRST:
 - If user says "add a row to [table]" or "add [item] to [table]" or "add [item] in [table]" → ALWAYS generate INSERT statement
 - If user says "add a table called [name]" or "create table [name]" → generate CREATE TABLE statement
 - If user says "delete [item] from [table]" or "remove [item] from [table]" → ALWAYS generate DELETE statement
 - "add a row to the teachers table" → INSERT INTO teachers (name, subject) VALUES ('New Teacher', 'Subject');
 - "add a teacher in the teachers table" → INSERT INTO teachers (name, subject) VALUES ('John Smith', 'Mathematics');
+- "add a worker to the workers table with id = 5" → INSERT INTO workers (id, name, position) VALUES (5, 'New Worker', 'Position');
 - "delete a worker with id = 5 from the workers table" → DELETE FROM workers WHERE id = 5;
+- "delete a row from the workers table with id = 5" → DELETE FROM workers WHERE id = 5;
+- "delete the row with id = 5 from the table workers" → DELETE FROM workers WHERE id = 5;
+- If schema is "test": "delete the row with id = 5 from the table workers" → DELETE FROM test.workers WHERE id = 5;
 - NEVER create tables when user wants to add data to existing tables!
 - NEVER give instructions when user wants to delete data - ALWAYS generate DELETE SQL!
+- CRITICAL: Always use "DELETE FROM table_name" syntax, never "DELETE table_name"!
+- MANDATORY: Every DELETE statement MUST include the word "FROM"!
+
+🧠 SMART TABLE UNDERSTANDING:
+- When user mentions a table name, use the provided schema to understand its structure
+- For INSERT operations, include appropriate columns based on the table schema
+- If user specifies values (like "with id = 5"), include those in the INSERT statement
+- Use reasonable default values for unspecified columns (avoid NULL for NOT NULL columns)
+- PRIMARY KEY columns can be omitted if they're auto-increment, or included if user specifies them
 
 SCHEMA UNDERSTANDING:
 The provided schema shows tables with their columns and constraints. Each table entry shows:
@@ -61,6 +87,25 @@ The provided schema shows tables with their columns and constraints. Each table 
 CRITICAL: Always use the correct schema name from "DATABASE SCHEMA: [name]" in your queries.
 For example, if schema is "test_12345", use "test_12345.table_name" in your SQL.
 IMPORTANT: Use schema.table_name format, NOT schema.schema.table_name - avoid double schema prefixes!
+SCHEMA USAGE RULES:
+- If schema is provided in "DATABASE SCHEMA: [name]", ALWAYS prefix table names with schema_name.
+- Example: If schema is "test" and table is "workers", use "test.workers"
+- NEVER use "test.test.workers" or any double schema prefixes
+- For DELETE: DELETE FROM test.workers WHERE id = 5;
+- For INSERT: INSERT INTO test.workers (id, name) VALUES (5, 'John');
+
+DELETE SYNTAX RULES:
+- ALWAYS use: DELETE FROM table_name WHERE condition;
+- NEVER use: DELETE table_name WHERE condition;
+- Example: DELETE FROM workers WHERE id = 5;
+- Example: DELETE FROM test.workers WHERE id = 5;
+- The FROM keyword is MANDATORY in DELETE statements!
+
+SCHEMA PREFIX EXAMPLES FOR DELETE:
+- If schema is "test" and table is "workers": DELETE FROM test.workers WHERE id = 5;
+- NEVER: DELETE FROM test.test.workers WHERE id = 5; (double schema prefix is WRONG!)
+- NEVER: DELETE FROM test.test.workers WHERE id = 5; (double schema prefix is WRONG!)
+- CORRECT: DELETE FROM test.workers WHERE id = 5;
 
 TABLE CREATION WITH EXISTING SCHEMA:
 When creating tables and a schema is provided, ALWAYS use the schema name in your CREATE TABLE statements.
@@ -83,8 +128,17 @@ CORE CAPABILITIES:
 - NEVER provide instructions on how to delete - ALWAYS execute the deletion
 - Examples: "delete worker with id 5" → DELETE FROM workers WHERE id = 5;
 - Examples: "remove customer John" → DELETE FROM customers WHERE name = 'John';
+- Examples: "delete a row from the workers table with id = 5" → DELETE FROM workers WHERE id = 5;
+- Examples: "delete the row with id = 5 from the table workers" → DELETE FROM workers WHERE id = 5;
+- If schema is "test": "delete the row with id = 5 from the table workers" → DELETE FROM test.workers WHERE id = 5;
 - If schema is provided, use: DELETE FROM schema_name.table_name WHERE condition;
 - NEVER use double schema prefixes like schema.schema.table_name!
+- NEVER use: DELETE FROM test.test.workers (double schema prefix is WRONG!)
+- ALWAYS use: DELETE FROM test.workers (single schema prefix is CORRECT!)
+- ALWAYS use proper SQL syntax: DELETE FROM table_name WHERE condition;
+- CRITICAL: Always include the FROM keyword in DELETE statements!
+- WRONG: DELETE workers WHERE id = 5;
+- CORRECT: DELETE FROM workers WHERE id = 5;
 
 QUERY EXAMPLES BY CATEGORY:
 
@@ -140,6 +194,9 @@ IMPORTANT JOIN RULES:
 - "Add a random row to the table" → INSERT INTO test (name, description) VALUES ('Random Item', 'Random Description');
 - "Add a teacher in the teachers table" → INSERT INTO teachers (name, subject) VALUES ('John Smith', 'Mathematics');
 - "Add a teacher to teachers" → INSERT INTO teachers (name, subject) VALUES ('Jane Doe', 'Science');
+- "Add a worker to the workers table with id = 5" → INSERT INTO workers (id, name, position) VALUES (5, 'New Worker', 'Position');
+- "Add a worker to the workers table" → INSERT INTO workers (name, position) VALUES ('New Worker', 'Position');
+- "Add a student to the students table with id = 10" → INSERT INTO students (id, name, grade) VALUES (10, 'New Student', 'A');
 - "Insert teacher in teachers table" → INSERT INTO teachers (name, subject) VALUES ('Bob Johnson', 'English');
 - "Add a row to the teachers table" → INSERT INTO teachers (name, subject) VALUES ('New Teacher', 'Subject');
 - "Add a row to teachers" → INSERT INTO teachers (name, subject) VALUES ('New Teacher', 'Subject');
@@ -159,11 +216,22 @@ IMPORTANT JOIN RULES:
 - "insert [item] into [table]" → INSERT INTO [table] (columns) VALUES (values);
 - "create [item] in [table]" → INSERT INTO [table] (columns) VALUES (values);
 - "put [item] in [table]" → INSERT INTO [table] (columns) VALUES (values);
+- "add [item] to the [table] table" → INSERT INTO [table] (columns) VALUES (values);
+- "add [item] to [table] with [condition]" → INSERT INTO [table] (columns) VALUES (values);
+- "add [item] to [table] table with [condition]" → INSERT INTO [table] (columns) VALUES (values);
 - "add [item] in [table]" → INSERT INTO [table] (columns) VALUES (values);
 
 📝 SPECIFIC INSERT EXAMPLES FOR COMMON TABLES:
 - "insert into users (name, email) values ('John', 'john@email.com')" → INSERT INTO users (name, email) VALUES ('John', 'john@email.com');
 - "add a user with name John and email john@test.com" → INSERT INTO users (name, email) VALUES ('John', 'john@test.com');
+
+🧠 TABLE-AWARE INSERT OPERATIONS:
+- When user says "add a worker to the workers table with id = 5", analyze the workers table schema
+- Include the specified values (id = 5) and reasonable defaults for other columns
+- Example: If workers table has (id, name, position, salary), generate:
+  INSERT INTO workers (id, name, position, salary) VALUES (5, 'New Worker', 'Position', 50000);
+- If user doesn't specify values for required columns, use reasonable defaults
+- Always respect NOT NULL constraints and data types from the schema
 - "create a new user John Doe" → INSERT INTO users (name) VALUES ('John Doe');
 - "insert a product with name Laptop and price 1200" → INSERT INTO products (name, price) VALUES ('Laptop', 1200);
 - "add product Laptop costing 1200" → INSERT INTO products (name, price) VALUES ('Laptop', 1200);
@@ -208,8 +276,16 @@ IMPORTANT JOIN RULES:
 - "Remove worker id 5 from workers table" → DELETE FROM workers WHERE id = 5;
 - "Delete a customer with id 10" → DELETE FROM customers WHERE id = 10;
 - "Remove employee with name John" → DELETE FROM employees WHERE name = 'John';
+- "Delete a row from the workers table with id = 5" → DELETE FROM workers WHERE id = 5;
+- "Remove a row from workers with id = 5" → DELETE FROM workers WHERE id = 5;
+- "delete the row with id = 5 from the table workers" → DELETE FROM workers WHERE id = 5;
 - If schema is "test": "delete worker with id 5" → DELETE FROM test.workers WHERE id = 5;
+- If schema is "test": "delete the row with id = 5 from the table workers" → DELETE FROM test.workers WHERE id = 5;
 - NEVER: DELETE FROM test.test.workers (double schema prefix is WRONG!)
+- NEVER: DELETE FROM test.test.workers (double schema prefix is WRONG!)
+- NEVER: DELETE workers WHERE id = 5 (missing FROM keyword is WRONG!)
+- ALWAYS: DELETE FROM workers WHERE id = 5 (correct syntax)
+- ALWAYS: DELETE FROM test.workers WHERE id = 5 (correct schema prefix)
 
 🗑️ DROP TABLE QUERIES (Remove Tables):
 - "Drop the customers table" → DROP TABLE customers;
@@ -607,4 +683,4 @@ async function extractSchemaName(prompt) {
   return extractedName === "null" ? null : extractedName;
 }
 
-module.exports = { generateSQL, explainResults, chat, extractSchemaName, generateChatTitle };
+module.exports = { generateSQL, explainResults, chat, extractSchemaName, generateChatTitle, clearCache };

@@ -622,7 +622,8 @@ async function executeQueryOnUserDb(dbId, userId, query) {
     
     for (const tableRow of tableRows) {
       // More specific regex to only match table names in FROM clauses, not in string literals
-      const regex = new RegExp(`\\bFROM\\s+${tableRow.table_name}\\b`, 'gi');
+      // But only if the table name is not already prefixed with a schema
+      const regex = new RegExp(`\\bFROM\\s+(?!${schemaName}\\.)${tableRow.table_name}\\b`, 'gi');
       modifiedQuery = modifiedQuery.replace(regex, `FROM \`${schemaName}\`.\`${tableRow.mysql_table_name}\``);
     }
   }
