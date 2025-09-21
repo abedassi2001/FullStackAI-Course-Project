@@ -7,6 +7,7 @@ const {
   getDatabaseSchema,
   listUserDatabases,
   isMySQLAvailable,
+  syncAllUserDatabases,
   // ⬇️ make sure this exists in sqliteToMysqlService.js
   // (implement it if it's not there yet)
   getDatabaseFilePath,
@@ -86,6 +87,26 @@ exports.listDBs = async (req, res) => {
   } catch (err) {
     console.error("List DBs error:", err);
     res.status(500).json({ success: false, error: "Failed to list databases" });
+  }
+};
+
+// Sync all databases for a user
+exports.syncDatabases = async (req, res) => {
+  try {
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ success: false, error: "Unauthorized" });
+
+    console.log(`🔄 Manual sync requested for user ${uid}`);
+    const syncedCount = await syncAllUserDatabases(uid);
+    
+    res.json({ 
+      success: true, 
+      message: `Successfully synced ${syncedCount} databases`,
+      syncedCount 
+    });
+  } catch (err) {
+    console.error("Sync databases error:", err);
+    res.status(500).json({ success: false, error: "Failed to sync databases" });
   }
 };
 

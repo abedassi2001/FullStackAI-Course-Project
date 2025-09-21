@@ -673,6 +673,14 @@ async function executeQueryOnUserDb(dbId, userId, query) {
 async function listUserDatabases(userId) {
   await ensureSchema();
   
+  // First, sync all databases to ensure metadata is up-to-date
+  try {
+    await syncAllUserDatabases(userId);
+  } catch (err) {
+    console.warn(`⚠️ Failed to sync databases for user ${userId}:`, err.message);
+    // Continue with the query even if sync fails
+  }
+  
   const [rows] = await pool.execute(
     `SELECT 
        d.id,
@@ -813,6 +821,128 @@ async function updateDatabaseTablesAfterDrop(dbId, userId, droppedTableName) {
   }
 }
 
+// Extract table name from INSERT statement
+function extractTableNameFromInsert(insertSQL) {
+  try {
+    // Handle various INSERT patterns:
+    // INSERT INTO table_name ...
+    // INSERT INTO schema.table_name ...
+    // INSERT INTO `table_name` ...
+    // INSERT INTO `schema`.`table_name` ...
+    const insertMatch = insertSQL.toLowerCase().match(/insert\s+into\s+(?:[`"]?\w+[`"]?\.)?[`"]?(\w+)[`"]?/i);
+    if (!insertMatch) {
+      console.error(`❌ Could not extract table name from INSERT statement: ${insertSQL}`);
+      return null;
+    }
+    
+    return insertMatch[1];
+  } catch (err) {
+    console.error(`❌ Error extracting table name from INSERT statement:`, err);
+    return null;
+  }
+}
+
+// Update row count for a specific table in database_tables
+async function updateTableRowCount(dbId, tableName) {
+  try {
+    await ensureSchema();
+    
+    // Get database info to determine schema name
+    const [dbRows] = await pool.execute(
+      `SELECT mysql_schema_name FROM user_databases WHERE id = ?`,
+      [dbId]
+    );
+    
+    if (dbRows.length === 0) {
+      console.error(`❌ Database not found for dbId ${dbId}`);
+      return false;
+    }
+    
+    const schemaName = dbRows[0].mysql_schema_name;
+    
+    // Get current row count for the table
+    let rowCount = 0;
+    try {
+      const [countRows] = await pool.execute(
+        `SELECT COUNT(*) as count FROM \`${schemaName}\`.\`${tableName}\``
+      );
+      rowCount = countRows[0].count;
+    } catch (err) {
+      console.warn(`⚠️ Could not get row count for table ${tableName}:`, err.message);
+      return false;
+    }
+    
+    // Update the row count in database_tables
+    const [result] = await pool.execute(
+      `UPDATE database_tables SET row_count = ? WHERE db_id = ? AND table_name = ?`,
+      [rowCount, dbId, tableName]
+    );
+    
+    if (result.affectedRows > 0) {
+      console.log(`✅ Updated row count for table ${tableName} to ${rowCount} rows`);
+      return true;
+    } else {
+      console.warn(`⚠️ No rows updated for table ${tableName} in database_tables`);
+      return false;
+    }
+  } catch (err) {
+    console.error(`❌ Error updating row count for table ${tableName}:`, err);
+    return false;
+  }
+}
+
+// Update database_tables when a table is created
+async function updateDatabaseTablesAfterCreation(dbId, createTableSQL) {
+  try {
+    await ensureSchema();
+    
+    // Extract table name from CREATE TABLE statement
+    // Handle both "CREATE TABLE table_name" and "CREATE TABLE schema.table_name"
+    const createMatch = createTableSQL.toLowerCase().match(/create\s+table\s+(?:if\s+not\s+exists\s+)?(?:[`"]?\w+[`"]?\.)?[`"]?(\w+)[`"]?/i);
+    if (!createMatch) {
+      console.error(`❌ Could not extract table name from CREATE TABLE statement: ${createTableSQL}`);
+      return;
+    }
+    
+    const tableName = createMatch[1];
+    console.log(`📊 Adding new table ${tableName} to database_tables for dbId ${dbId}`);
+    
+    // Get database info to determine schema name
+    const [dbRows] = await pool.execute(
+      `SELECT mysql_schema_name FROM user_databases WHERE id = ?`,
+      [dbId]
+    );
+    
+    if (dbRows.length === 0) {
+      console.error(`❌ Database not found for dbId ${dbId}`);
+      return;
+    }
+    
+    const schemaName = dbRows[0].mysql_schema_name;
+    
+    // Get row count for the new table
+    let rowCount = 0;
+    try {
+      const [countRows] = await pool.execute(
+        `SELECT COUNT(*) as count FROM \`${schemaName}\`.\`${tableName}\``
+      );
+      rowCount = countRows[0].count;
+    } catch (err) {
+      console.warn(`⚠️ Could not get row count for table ${tableName}:`, err.message);
+    }
+    
+    // Add the new table to database_tables
+    await pool.execute(
+      `INSERT INTO database_tables (db_id, table_name, mysql_table_name, row_count) VALUES (?, ?, ?, ?)`,
+      [dbId, tableName, tableName, rowCount]
+    );
+    
+    console.log(`✅ Added table ${tableName} to database_tables with ${rowCount} rows`);
+  } catch (err) {
+    console.error(`❌ Error updating database_tables after creation:`, err);
+  }
+}
+
 // Check if a table exists in the actual MySQL database
 async function tableExistsInDatabase(dbId, userId, tableName) {
   await ensureSchema();
@@ -841,6 +971,35 @@ async function tableExistsInDatabase(dbId, userId, tableName) {
   } catch (err) {
     console.error(`❌ Error checking table existence:`, err);
     return false;
+  }
+}
+
+// Sync all databases for a user
+async function syncAllUserDatabases(userId) {
+  await ensureSchema();
+  
+  try {
+    // Get all databases for the user
+    const [dbRows] = await pool.execute(
+      `SELECT id FROM user_databases WHERE user_id = ?`,
+      [String(userId)]
+    );
+    
+    console.log(`🔄 Syncing ${dbRows.length} databases for user ${userId}`);
+    
+    let syncedCount = 0;
+    for (const dbRow of dbRows) {
+      const success = await syncDatabaseTables(dbRow.id, userId);
+      if (success) {
+        syncedCount++;
+      }
+    }
+    
+    console.log(`✅ Synced ${syncedCount}/${dbRows.length} databases for user ${userId}`);
+    return syncedCount;
+  } catch (err) {
+    console.error(`❌ Error syncing all user databases:`, err);
+    return 0;
   }
 }
 
@@ -876,6 +1035,8 @@ async function syncDatabaseTables(dbId, userId) {
       [dbId]
     );
     
+    const existingTableNames = dbTables.map(t => t.mysql_table_name);
+    
     // Remove tables that no longer exist in MySQL
     for (const dbTable of dbTables) {
       if (!actualTableNames.includes(dbTable.mysql_table_name)) {
@@ -884,6 +1045,29 @@ async function syncDatabaseTables(dbId, userId) {
           [dbId, dbTable.table_name]
         );
         console.log(`🗑️ Synced: Removed non-existent table ${dbTable.table_name} from database_tables`);
+      }
+    }
+    
+    // Add tables that exist in MySQL but are missing from database_tables
+    for (const actualTable of actualTables) {
+      if (!existingTableNames.includes(actualTable.TABLE_NAME)) {
+        // Get row count for the table
+        let rowCount = 0;
+        try {
+          const [countRows] = await pool.execute(
+            `SELECT COUNT(*) as count FROM \`${schemaName}\`.\`${actualTable.TABLE_NAME}\``
+          );
+          rowCount = countRows[0].count;
+        } catch (err) {
+          console.warn(`⚠️ Could not get row count for table ${actualTable.TABLE_NAME}:`, err.message);
+        }
+        
+        // Add the missing table to database_tables
+        await pool.execute(
+          `INSERT INTO database_tables (db_id, table_name, mysql_table_name, row_count) VALUES (?, ?, ?, ?)`,
+          [dbId, actualTable.TABLE_NAME, actualTable.TABLE_NAME, rowCount]
+        );
+        console.log(`✅ Synced: Added missing table ${actualTable.TABLE_NAME} to database_tables with ${rowCount} rows`);
       }
     }
     
@@ -903,8 +1087,12 @@ module.exports = {
   initializeMySQL,
   isMySQLAvailable,
   updateDatabaseTablesAfterDrop,
+  updateDatabaseTablesAfterCreation,
+  updateTableRowCount,
+  extractTableNameFromInsert,
   tableExistsInDatabase,
   syncDatabaseTables,
+  syncAllUserDatabases,
   cleanupOrphanedDatabases,
   migrateSchemaNames,
   getDatabaseFilePath,

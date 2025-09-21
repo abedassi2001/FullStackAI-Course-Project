@@ -13,6 +13,9 @@ router.post("/", requireAuth, upload.single("dbfile"), ctrl.uploadDB);
 // List your saved DBs (id, filename, size, created_at)
 router.get("/", requireAuth, ctrl.listDBs);
 
+// Sync all databases for a user
+router.post("/sync", requireAuth, ctrl.syncDatabases);
+
 // Preview schema (tables + columns)
 router.get("/:id/schema", requireAuth, ctrl.schemaPreview);
 

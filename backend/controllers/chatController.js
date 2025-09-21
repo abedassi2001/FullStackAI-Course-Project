@@ -6,6 +6,9 @@ const {
   getDatabaseSchema,
   executeQueryOnUserDb,
   updateDatabaseTablesAfterDrop,
+  updateDatabaseTablesAfterCreation,
+  updateTableRowCount,
+  extractTableNameFromInsert,
   syncDatabaseTables,
 } = require("../services/sqliteToMysqlService");
 const chatService = require("../services/chatService");
@@ -372,6 +375,118 @@ exports.sendMessage = async (req, res) => {
         return res.status(500).json({ 
           success: false, 
           message: `Failed to create schema: ${err.message}`,
+          sql,
+          intent: intent
+        });
+      }
+    }
+
+    // Handle CREATE TABLE operations
+    if (intent.intent === "create_table") {
+      if (!dbId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Please select a database to create tables in.",
+          intent: intent
+        });
+      }
+
+      try {
+        console.log('🏗️ Processing CREATE TABLE operation');
+        
+        // Execute the CREATE TABLE query
+        const rows = await executeQueryOnUserDb(dbId, uid, sql);
+        
+        // Update database_tables to add the new table
+        await updateDatabaseTablesAfterCreation(dbId, sql);
+        
+        // Generate explanation
+        const explanation = `✅ Table created successfully!`;
+        const chatExplanation = await chat(`I just created a new table using this SQL: ${sql}. Explain what this table does and what the user should know about it.`, []);
+        
+        console.log(`✅ Table created successfully`);
+
+        // Save assistant message to database
+        await chatService.addMessage(chatId, uid, 'assistant', explanation, sql, null, {
+          isDualResponse: true,
+          chatExplanation: chatExplanation,
+          tableCreated: true,
+          intent: intent.intent
+        });
+
+        return res.json({ 
+          success: true, 
+          sql, 
+          explanation: explanation,
+          chatExplanation: chatExplanation,
+          isDualResponse: true,
+          tableCreated: true,
+          intent: intent,
+          title: generatedTitle
+        });
+      } catch (err) {
+        console.error("❌ CREATE TABLE error:", err);
+        return res.status(500).json({ 
+          success: false, 
+          message: `Failed to create table: ${err.message}`,
+          sql,
+          intent: intent
+        });
+      }
+    }
+
+    // Handle INSERT operations
+    if (intent.intent === "database_query" && lowerSql.includes('insert into')) {
+      if (!dbId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Please select a database to insert data into.",
+          intent: intent
+        });
+      }
+
+      try {
+        console.log('➕ Processing INSERT operation');
+        
+        // Execute the INSERT query
+        const rows = await executeQueryOnUserDb(dbId, uid, sql);
+        
+        // Extract table name and update row count
+        const tableName = extractTableNameFromInsert(sql);
+        if (tableName) {
+          await updateTableRowCount(dbId, tableName);
+          console.log(`📊 Updated row count for table ${tableName} after INSERT`);
+        }
+        
+        // Generate explanation
+        const explanation = `✅ Data inserted successfully!`;
+        const chatExplanation = await chat(`I just inserted data using this SQL: ${sql}. Explain what this operation does and what the user should know about it.`, []);
+        
+        console.log(`✅ INSERT executed successfully`);
+
+        // Save assistant message to database
+        await chatService.addMessage(chatId, uid, 'assistant', explanation, sql, null, {
+          isDualResponse: true,
+          chatExplanation: chatExplanation,
+          dataInserted: true,
+          intent: intent.intent
+        });
+
+        return res.json({ 
+          success: true, 
+          sql, 
+          explanation: explanation,
+          chatExplanation: chatExplanation,
+          isDualResponse: true,
+          dataInserted: true,
+          intent: intent,
+          title: generatedTitle
+        });
+      } catch (err) {
+        console.error("❌ INSERT error:", err);
+        return res.status(500).json({ 
+          success: false, 
+          message: `Failed to insert data: ${err.message}`,
           sql,
           intent: intent
         });

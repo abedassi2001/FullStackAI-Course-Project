@@ -198,7 +198,9 @@ const ChatGPT = ({ createNewChat, updateChatTitle, setTitleLoadingState, current
         isDualResponse: res.data.isDualResponse || false,
         chatExplanation: res.data.chatExplanation,
         tableDropped: res.data.tableDropped || false,
-        droppedTableName: res.data.droppedTableName
+        droppedTableName: res.data.droppedTableName,
+        tableCreated: res.data.tableCreated || false,
+        dataInserted: res.data.dataInserted || false
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -209,7 +211,7 @@ const ChatGPT = ({ createNewChat, updateChatTitle, setTitleLoadingState, current
       }
 
       // Refresh databases if needed
-      if (res.data.schemaCreated || res.data.tableDropped) {
+      if (res.data.schemaCreated || res.data.tableDropped || res.data.tableCreated || res.data.dataInserted) {
         fetchDatabases();
       }
     } catch (err) {
