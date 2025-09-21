@@ -65,7 +65,7 @@ const ChatGPTLayout = ({ children }) => {
       setChats(prev => prev.filter(chat => chat.id !== chatId));
       if (currentChatId === chatId) {
         setCurrentChatId(null);
-        navigate('/');
+        navigate('/app');
       }
     } catch (err) {
       console.error("Failed to delete chat:", err);
