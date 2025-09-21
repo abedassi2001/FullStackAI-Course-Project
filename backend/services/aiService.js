@@ -58,6 +58,12 @@ The provided schema shows tables with their columns and constraints. Each table 
 CRITICAL: Always use the correct schema name from "DATABASE SCHEMA: [name]" in your queries.
 For example, if schema is "test_12345", use "test_12345.table_name" in your SQL.
 
+TABLE CREATION WITH EXISTING SCHEMA:
+When creating tables and a schema is provided, ALWAYS use the schema name in your CREATE TABLE statements.
+- If schema is "ali" and user says "add a table called teachers" → CREATE TABLE ali.teachers (...)
+- If schema is "schools" and user says "add table students" → CREATE TABLE schools.students (...)
+- Always prefix the table name with the schema name when a schema is provided
+
 CORE CAPABILITIES:
 - SELECT queries: Retrieve and analyze data
 - INSERT queries: Add new records
@@ -198,6 +204,13 @@ IMPORTANT JOIN RULES:
 - "Create an orders table with customer_id and order_date" → CREATE TABLE orders (id INT PRIMARY KEY AUTO_INCREMENT, customer_id INT, order_date DATE, FOREIGN KEY (customer_id) REFERENCES customers(id));
 - "Create a schema called X" → CREATE TABLE X (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
 - "Create random tables" → CREATE TABLE sample_data (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+- "Add a table called teachers" → CREATE TABLE teachers (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), subject VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+- "Add table teachers" → CREATE TABLE teachers (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), subject VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+
+🏗️ CREATE TABLE QUERIES WITH SCHEMA (When schema is provided):
+- "Add a table called teachers" (schema: ali) → CREATE TABLE ali.teachers (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), subject VARCHAR(255), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+- "Add table students" (schema: schools) → CREATE TABLE schools.students (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), grade VARCHAR(50), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+- "Create a products table" (schema: store) → CREATE TABLE store.products (id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR(255), price DECIMAL(10,2), category VARCHAR(100));
 
 🔍 METADATA QUERIES (Database Info):
 - "Show me all tables" → SHOW TABLES;
@@ -288,6 +301,8 @@ COMMON PATTERNS TO RECOGNIZE - COMPREHENSIVE LIST:
 - "Create table" / "Make a table" / "Create a [table] table" → CREATE TABLE
 - "Create [table] table" / "Make [table] table" → CREATE TABLE
 - "Build [table] table" / "Generate [table] table" → CREATE TABLE
+- "Add a table called [name]" / "Add table [name]" → CREATE TABLE
+- "Add table called [name]" / "Add table [name]" → CREATE TABLE
 
 🏗️ CREATE SCHEMA PATTERNS:
 - "Create schema" / "Create database" / "Create db" → CREATE SCHEMA

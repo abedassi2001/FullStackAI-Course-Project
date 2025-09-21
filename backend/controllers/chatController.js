@@ -160,9 +160,38 @@ exports.sendMessage = async (req, res) => {
       }).join('\n\n');
 
       console.log(`📊 Database schema:`, schemaText);
-    } else if (intent.intent === "create_schema" || intent.intent === "create_table") {
-      console.log(`📊 Creating new schema/table`);
+    } else if (intent.intent === "create_schema") {
+      console.log(`📊 Creating new schema`);
       schemaText = "No existing schema - this is a new database creation request.";
+    } else if (intent.intent === "create_table") {
+      console.log(`📊 Creating new table`);
+      // For table creation, if we have a selected database, provide its schema context
+      if (dbId) {
+        const schemaInfo = await getDatabaseSchema(dbId, uid);
+        if (schemaInfo) {
+          const schemaName = schemaInfo.mysqlSchemaName;
+          schemaText = `DATABASE SCHEMA: ${schemaName}\n\n` + schemaInfo.tables.map(table => {
+            if (!table.columns || table.columns.length === 0) {
+              return `Table: ${table.name} - ${table.rowCount} rows\n  Columns: not available`;
+            }
+            
+            const columns = table.columns.map(col => {
+              let colInfo = `${col.name} (${col.type})`;
+              if (col.isPrimaryKey) colInfo += ' PRIMARY KEY';
+              if (col.nullable) colInfo += ' NULL';
+              else colInfo += ' NOT NULL';
+              return colInfo;
+            }).join(', ');
+            
+            return `Table: ${table.name} - ${table.rowCount} rows\n  Columns: ${columns}`;
+          }).join('\n\n');
+          console.log(`📊 Using existing schema for table creation:`, schemaName);
+        } else {
+          schemaText = "No existing schema - this is a new database creation request.";
+        }
+      } else {
+        schemaText = "No existing schema - this is a new database creation request.";
+      }
     }
 
     // Generate SQL query based on intent
