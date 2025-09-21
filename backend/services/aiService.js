@@ -43,9 +43,12 @@ async function generateSQL(prompt, schemaText, userId) {
 🚨 CRITICAL RULE - READ THIS FIRST:
 - If user says "add a row to [table]" or "add [item] to [table]" or "add [item] in [table]" → ALWAYS generate INSERT statement
 - If user says "add a table called [name]" or "create table [name]" → generate CREATE TABLE statement
+- If user says "delete [item] from [table]" or "remove [item] from [table]" → ALWAYS generate DELETE statement
 - "add a row to the teachers table" → INSERT INTO teachers (name, subject) VALUES ('New Teacher', 'Subject');
 - "add a teacher in the teachers table" → INSERT INTO teachers (name, subject) VALUES ('John Smith', 'Mathematics');
+- "delete a worker with id = 5 from the workers table" → DELETE FROM workers WHERE id = 5;
 - NEVER create tables when user wants to add data to existing tables!
+- NEVER give instructions when user wants to delete data - ALWAYS generate DELETE SQL!
 
 SCHEMA UNDERSTANDING:
 The provided schema shows tables with their columns and constraints. Each table entry shows:
@@ -57,6 +60,7 @@ The provided schema shows tables with their columns and constraints. Each table 
 
 CRITICAL: Always use the correct schema name from "DATABASE SCHEMA: [name]" in your queries.
 For example, if schema is "test_12345", use "test_12345.table_name" in your SQL.
+IMPORTANT: Use schema.table_name format, NOT schema.schema.table_name - avoid double schema prefixes!
 
 TABLE CREATION WITH EXISTING SCHEMA:
 When creating tables and a schema is provided, ALWAYS use the schema name in your CREATE TABLE statements.
@@ -73,6 +77,14 @@ CORE CAPABILITIES:
 - CREATE TABLE queries: Create new tables
 - DROP TABLE queries: Remove tables
 - Metadata queries: Show database structure
+
+🚨 DELETE OPERATION RULE:
+- When user requests to delete/remove data, ALWAYS generate DELETE SQL statement
+- NEVER provide instructions on how to delete - ALWAYS execute the deletion
+- Examples: "delete worker with id 5" → DELETE FROM workers WHERE id = 5;
+- Examples: "remove customer John" → DELETE FROM customers WHERE name = 'John';
+- If schema is provided, use: DELETE FROM schema_name.table_name WHERE condition;
+- NEVER use double schema prefixes like schema.schema.table_name!
 
 QUERY EXAMPLES BY CATEGORY:
 
@@ -191,6 +203,13 @@ IMPORTANT JOIN RULES:
 - "Remove customer with email john@test.com" → DELETE FROM customers WHERE email = 'john@test.com';
 - "Delete all products with price less than 50" → DELETE FROM products WHERE price < 50;
 - "Remove employees from the old department" → DELETE FROM employees WHERE department = 'old department';
+- "Delete a worker with id = 5 from the workers table" → DELETE FROM workers WHERE id = 5;
+- "Delete worker with id 5 from workers" → DELETE FROM workers WHERE id = 5;
+- "Remove worker id 5 from workers table" → DELETE FROM workers WHERE id = 5;
+- "Delete a customer with id 10" → DELETE FROM customers WHERE id = 10;
+- "Remove employee with name John" → DELETE FROM employees WHERE name = 'John';
+- If schema is "test": "delete worker with id 5" → DELETE FROM test.workers WHERE id = 5;
+- NEVER: DELETE FROM test.test.workers (double schema prefix is WRONG!)
 
 🗑️ DROP TABLE QUERIES (Remove Tables):
 - "Drop the customers table" → DROP TABLE customers;
@@ -291,6 +310,10 @@ COMMON PATTERNS TO RECOGNIZE - COMPREHENSIVE LIST:
 - "Remove [record]" / "Delete [record]" / "Erase [record]" → DELETE
 - "Remove [item] from [table]" / "Delete [item] from [table]" → DELETE
 - "Erase [item] from [table]" / "Remove [item] from [table]" → DELETE
+- "Delete a [item] with [condition] from [table]" → DELETE
+- "Remove a [item] with [condition] from [table]" → DELETE
+- "Delete [item] with [condition] from [table] table" → DELETE
+- "Remove [item] with [condition] from [table] table" → DELETE
 
 🏗️ DROP TABLE PATTERNS:
 - "Drop [table]" / "Remove [table]" / "Delete [table]" → DROP TABLE

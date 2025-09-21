@@ -200,7 +200,8 @@ const ChatGPT = ({ createNewChat, updateChatTitle, setTitleLoadingState, current
         tableDropped: res.data.tableDropped || false,
         droppedTableName: res.data.droppedTableName,
         tableCreated: res.data.tableCreated || false,
-        dataInserted: res.data.dataInserted || false
+        dataInserted: res.data.dataInserted || false,
+        dataDeleted: res.data.dataDeleted || false
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -211,7 +212,7 @@ const ChatGPT = ({ createNewChat, updateChatTitle, setTitleLoadingState, current
       }
 
       // Refresh databases if needed
-      if (res.data.schemaCreated || res.data.tableDropped || res.data.tableCreated || res.data.dataInserted) {
+      if (res.data.schemaCreated || res.data.tableDropped || res.data.tableCreated || res.data.dataInserted || res.data.dataDeleted) {
         fetchDatabases();
       }
     } catch (err) {

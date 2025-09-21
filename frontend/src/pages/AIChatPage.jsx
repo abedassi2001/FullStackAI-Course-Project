@@ -404,13 +404,14 @@ export default function AIChatPage() {
         tableDropped: res.data?.tableDropped || false,
         droppedTableName: res.data?.droppedTableName,
         tableCreated: res.data?.tableCreated || false,
-        dataInserted: res.data?.dataInserted || false
+        dataInserted: res.data?.dataInserted || false,
+        dataDeleted: res.data?.dataDeleted || false
       };
       
       setHistory((h) => [...h, assistantMessage]);
       
-      // Refresh databases list if a schema was created, table was dropped, table was created, or data was inserted
-      if (res.data?.schemaCreated || res.data?.tableDropped || res.data?.tableCreated || res.data?.dataInserted) {
+      // Refresh databases list if a schema was created, table was dropped, table was created, data was inserted, or data was deleted
+      if (res.data?.schemaCreated || res.data?.tableDropped || res.data?.tableCreated || res.data?.dataInserted || res.data?.dataDeleted) {
         fetchDatabases();
       }
     } catch (err) {

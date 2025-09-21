@@ -6,12 +6,14 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 function detectIntentFast(message) {
   const msg = message.toLowerCase();
   
-  // Database query keywords - enhanced for INSERT recognition
+  // Database query keywords - enhanced for INSERT and DELETE recognition
   const queryKeywords = ['show', 'get', 'find', 'select', 'insert', 'update', 'delete', 'add', 'change', 'remove', 'all table', 'table names', 'list tables'];
   const insertKeywords = ['insert', 'add', 'create', 'put', 'insert into', 'add to', 'put in', 'add data', 'insert data', 'create data', 'put data', 'add new', 'insert new', 'create new', 'put new', 'add item', 'insert item', 'create item', 'put item'];
+  const deleteKeywords = ['delete', 'remove', 'erase', 'delete from', 'remove from', 'erase from', 'delete a', 'remove a', 'erase a', 'delete the', 'remove the', 'erase the'];
   const joinKeywords = ['join', 'connect', 'link', 'combine', 'merge', 'show with', 'display with', 'together', 'with their', 'and their', 'table with', 'table to', 'db with', 'database with', 'join the', 'connect the', 'link the'];
   const hasQueryKeywords = queryKeywords.some(keyword => msg.includes(keyword));
   const hasInsertKeywords = insertKeywords.some(keyword => msg.includes(keyword));
+  const hasDeleteKeywords = deleteKeywords.some(keyword => msg.includes(keyword));
   const hasJoinKeywords = joinKeywords.some(keyword => msg.includes(keyword));
   
   // Create keywords (removed table creation keywords)
@@ -59,6 +61,16 @@ function detectIntentFast(message) {
       intent: 'database_query',
       confidence: 0.95,
       reasoning: 'Contains INSERT operation keywords',
+      requiresDatabase: true
+    };
+  }
+  
+  // Check for DELETE operations (high priority)
+  if (hasDeleteKeywords) {
+    return {
+      intent: 'database_query',
+      confidence: 0.95,
+      reasoning: 'Contains DELETE operation keywords',
       requiresDatabase: true
     };
   }

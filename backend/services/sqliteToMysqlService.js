@@ -821,6 +821,27 @@ async function updateDatabaseTablesAfterDrop(dbId, userId, droppedTableName) {
   }
 }
 
+// Extract table name from DELETE statement
+function extractTableNameFromDelete(deleteSQL) {
+  try {
+    // Handle various DELETE patterns:
+    // DELETE FROM table_name ...
+    // DELETE FROM schema.table_name ...
+    // DELETE FROM `table_name` ...
+    // DELETE FROM `schema`.`table_name` ...
+    const deleteMatch = deleteSQL.toLowerCase().match(/delete\s+from\s+(?:[`"]?\w+[`"]?\.)?[`"]?(\w+)[`"]?/i);
+    if (!deleteMatch) {
+      console.error(`❌ Could not extract table name from DELETE statement: ${deleteSQL}`);
+      return null;
+    }
+    
+    return deleteMatch[1];
+  } catch (err) {
+    console.error(`❌ Error extracting table name from DELETE statement:`, err);
+    return null;
+  }
+}
+
 // Extract table name from INSERT statement
 function extractTableNameFromInsert(insertSQL) {
   try {
@@ -1090,6 +1111,7 @@ module.exports = {
   updateDatabaseTablesAfterCreation,
   updateTableRowCount,
   extractTableNameFromInsert,
+  extractTableNameFromDelete,
   tableExistsInDatabase,
   syncDatabaseTables,
   syncAllUserDatabases,

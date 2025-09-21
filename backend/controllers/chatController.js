@@ -9,6 +9,7 @@ const {
   updateDatabaseTablesAfterCreation,
   updateTableRowCount,
   extractTableNameFromInsert,
+  extractTableNameFromDelete,
   syncDatabaseTables,
 } = require("../services/sqliteToMysqlService");
 const chatService = require("../services/chatService");
@@ -487,6 +488,65 @@ exports.sendMessage = async (req, res) => {
         return res.status(500).json({ 
           success: false, 
           message: `Failed to insert data: ${err.message}`,
+          sql,
+          intent: intent
+        });
+      }
+    }
+
+    // Handle DELETE operations
+    console.log('🔍 Checking for DELETE operation:', { intent: intent.intent, lowerSql, hasDeleteFrom: lowerSql.includes('delete from') });
+    if (intent.intent === "database_query" && lowerSql.includes('delete from')) {
+      if (!dbId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Please select a database to delete data from.",
+          intent: intent
+        });
+      }
+
+      try {
+        console.log('🗑️ Processing DELETE operation');
+        
+        // Execute the DELETE query
+        const rows = await executeQueryOnUserDb(dbId, uid, sql);
+        
+        // Extract table name and update row count
+        const tableName = extractTableNameFromDelete(sql);
+        if (tableName) {
+          await updateTableRowCount(dbId, tableName);
+          console.log(`📊 Updated row count for table ${tableName} after DELETE`);
+        }
+        
+        // Generate explanation
+        const explanation = `✅ Data deleted successfully!`;
+        const chatExplanation = await chat(`I just deleted data using this SQL: ${sql}. Explain what this operation does and what the user should know about it.`, []);
+        
+        console.log(`✅ DELETE executed successfully`);
+
+        // Save assistant message to database
+        await chatService.addMessage(chatId, uid, 'assistant', explanation, sql, null, {
+          isDualResponse: true,
+          chatExplanation: chatExplanation,
+          dataDeleted: true,
+          intent: intent.intent
+        });
+
+        return res.json({ 
+          success: true, 
+          sql, 
+          explanation: explanation,
+          chatExplanation: chatExplanation,
+          isDualResponse: true,
+          dataDeleted: true,
+          intent: intent,
+          title: generatedTitle
+        });
+      } catch (err) {
+        console.error("❌ DELETE error:", err);
+        return res.status(500).json({ 
+          success: false, 
+          message: `Failed to delete data: ${err.message}`,
           sql,
           intent: intent
         });
